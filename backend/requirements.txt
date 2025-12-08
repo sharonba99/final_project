@@ -1,0 +1,4 @@
+Flask
+gunicorn
+psycopg2-binary  # Library to connect to PostgreSQL
+prometheus-flask-exporter
