@@ -13,10 +13,10 @@ app = Flask(__name__)
 metrics = PrometheusMetrics(app)
 
 # Configuration for Database connection
-DB_HOST = os.environ.get('POSTGRES_HOST', 'localhost')
-DB_NAME = os.environ.get('POSTGRES_DB', 'db')
-DB_USER = os.environ.get('POSTGRES_USER', 'user')
-DB_PASS = os.environ.get('POSTGRES_PASSWORD', 'password')
+DB_HOST = os.environ.get('POSTGRES_HOST', 'db')
+DB_NAME = os.environ.get('POSTGRES_DB', 'urldb')
+DB_USER = os.environ.get('POSTGRES_USER', 'devuser')
+DB_PASS = os.environ.get('POSTGRES_PASSWORD', 'devpassword')
 SHORT_CODE_LENGTH = 6
 
 def get_db_connection():

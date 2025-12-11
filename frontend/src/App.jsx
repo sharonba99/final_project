@@ -1,10 +1,11 @@
-// Inside App.jsx
-import ShortenerForm from './components/ShortenerForm'; 
+// frontend/src/App.jsx
+import React from 'react';
+import ShortenerForm from './ShortenerForm.jsx'; // Assuming your form is here
 
 function App() {
   return (
-    <div className="container">
-      <h1>⚡️ Quick-Link URL Shortener</h1>
+    <div style={{ padding: '20px', textAlign: 'center' }}>
+      <h1>⚡️ Dockerized URL Shortener</h1>
       <ShortenerForm />
     </div>
   );
