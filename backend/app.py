@@ -5,12 +5,18 @@ import random
 import string
 from flask import Flask, request, redirect, jsonify, abort
 from prometheus_flask_exporter import PrometheusMetrics 
+from prometheus_client import Counter
 import psycopg2
 from psycopg2 import extras # For dictionary cursor
 
 app = Flask(__name__)
 # Initialize Prometheus metrics on the app
 metrics = PrometheusMetrics(app)
+
+urls_shortened_counter = metrics.register(
+    'urls_shortened_total',
+    'Total number of URLs shortened'
+)
 
 # Configuration for Database connection
 DB_HOST = os.environ.get('POSTGRES_HOST', 'db')
@@ -62,16 +68,9 @@ def generate_short_code(length=SHORT_CODE_LENGTH):
 
 # --- Application Endpoints ---
 
-@app.before_request
-def before_request():
-    """Initialize the database before the first request."""
-    if not hasattr(app, 'db_initialized'):
-        initialize_db()
-        app.db_initialized = True
 
 @app.route('/api/shorten', methods=['POST'])
 def shorten_url():
-    """Receives a long URL, generates a short code, and saves it."""
     data = request.json
     long_url = data.get('url')
 
@@ -83,28 +82,26 @@ def shorten_url():
         return jsonify({"error": "Database service unavailable."}), 503
 
     try:
-        # Generate a unique code (simple retry logic for collision)
         short_code = generate_short_code()
-        
         cur = conn.cursor()
-        # Insert the new URL mapping
+
         cur.execute(
             "INSERT INTO urls (short_code, long_url) VALUES (%s, %s)",
             (short_code, long_url)
         )
         conn.commit()
         cur.close()
-        
-        # Increment a custom Prometheus counter for URLs shortened
-        metrics.info('urls_shortened', 'Total number of URLs shortened')
-        
-        # Return the generated short code
+
+        # Increment Prometheus counter
+        urls_shortened_counter.inc()
+
         return jsonify({"short_code": short_code}), 201
 
-    except psycopg2.Error as e:
+    except Exception as e:
         conn.rollback()
         print(f"Database error during insert: {e}")
         return jsonify({"error": "Internal database error."}), 500
+
     finally:
         conn.close()
 
