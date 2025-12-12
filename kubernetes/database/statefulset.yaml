@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: database
+  namespace: urlshortener
+  labels:
+    app: database
+spec:
+  selector:
+    matchLabels:
+      app: database
+  serviceName: "database-headless-service"
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: database
+    spec:
+      containers:
+      - name: database
+        image: postgres:15
+        ports:
+        - containerPort: 5432
+          name: db-port
+        envFrom:
+        - secretRef:
+            name: database-secret
+        volumeMounts:
+        - name: db-persistent-storage
+          mountPath: /var/lib/postgresql/data
+  volumeClaimTemplates:
+  - metadata:
+      name: db-persistent-storage
+      namespace: urlshortener 
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      storageClassName: standard
+      resources:
+        requests:
+          storage: 5Gi

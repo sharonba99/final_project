@@ -1,0 +1,72 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: urlshortener
+  labels:
+    app: prometheus
+data:
+  prometheus.yml: |
+    global:
+      # How often Prometheus will scrape targets by default
+      scrape_interval: 15s 
+      # How long targets are marked as down before alerts are sent
+      evaluation_interval: 15s
+
+    # Rule files to load
+    rule_files:
+      # - '/etc/prometheus/rules/*.yml' # Placeholder for alert rules
+
+    scrape_configs:
+      # 1. Prometheus Scrape (Scraping itself)
+      - job_name: 'prometheus'
+        # Targets are defined statically
+        static_configs:
+          - targets: ['localhost:9090']
+
+      # 2. Kubernetes Service Endpoints (For the cluster components)
+      - job_name: 'kubernetes-apiservers'
+        kubernetes_sd_configs:
+          - role: endpoints
+        # Filter to only scrape the default/kubernetes endpoints
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_namespace, __meta_kubernetes_service_name, __meta_kubernetes_endpoint_port_name]
+            regex: default;kubernetes;https
+            action: keep
+        scheme: https
+        # Required for scraping the secure Kubernetes API server
+        tls_config:
+          ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+        bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+        # Disable certificate verification (if using self-signed certs)
+        insecure_skip_verify: true
+
+      # 3. Pod Scrape (Discovering Frontend/Backend application pods)
+      - job_name: 'kubernetes-pods'
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names: ['urlshortener'] # Only look in our namespace
+        
+        # Keep only the pods that have the 'prometheus.io/scrape' annotation set to 'true'
+        relabel_configs:
+          # Keep only pods with the scrape annotation
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+            action: keep
+            regex: true
+          # Define the target port from the annotation or default to 8080
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_port]
+            action: replace
+            target_label: __address__
+            regex: (.+):.+$
+            replacement: $1:$$1
+          - source_labels: [__meta_kubernetes_pod_ip, __meta_kubernetes_pod_annotation_prometheus_io_port]
+            action: replace
+            target_label: __address__
+            regex: (.+);(\d+)
+            replacement: $1:$2
+          # Replace the default metric path with the one from the annotation, or use /metrics
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+            action: replace
+            target_label: __metrics_path__
+            regex: (.+)
