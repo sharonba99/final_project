@@ -37,9 +37,10 @@ data:
         # Required for scraping the secure Kubernetes API server
         tls_config:
           ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
-        bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+        
         # Disable certificate verification (if using self-signed certs)
-        insecure_skip_verify: true
+          insecure_skip_verify: true
+        bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
 
       # 3. Pod Scrape (Discovering Frontend/Backend application pods)
       - job_name: 'kubernetes-pods'
