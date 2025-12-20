@@ -1,4 +1,7 @@
-Flask
-gunicorn
-psycopg2-binary  # Library to connect to PostgreSQL
-prometheus-flask-exporter
+Flask==3.0.0
+flask-cors==4.0.0
+gunicorn==21.2.0
+psycopg2-binary==2.9.9
+prometheus-flask-exporter==0.23.0
+prometheus-client==0.17.1
+flask-cors
