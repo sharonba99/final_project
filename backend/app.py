@@ -1,145 +1,167 @@
-# url-shortener/backend/app.py
-
 import os
 import random
 import string
-from flask import Flask, request, redirect, jsonify, abort
-from prometheus_flask_exporter import PrometheusMetrics 
-from prometheus_client import Counter
 import psycopg2
-from psycopg2 import extras # For dictionary cursor
-
+from psycopg2 import pool, extras
+from flask import Flask, request, jsonify, redirect, abort
+from flask_cors import CORS
+from prometheus_client import Counter, generate_latest
+import re
+from urllib.parse import urlparse
 app = Flask(__name__)
-# Initialize Prometheus metrics on the app
-metrics = PrometheusMetrics(app)
 
-urls_shortened_counter = metrics.register(
-    'urls_shortened_total',
-    'Total number of URLs shortened'
-)
+# Allow all origins so frontend can talk to backend
+CORS(app)
 
-# Configuration for Database connection
-DB_HOST = os.environ.get('POSTGRES_HOST', 'db')
+# Metrics
+REQUESTS = Counter('http_requests_total', 'Total HTTP Requests')
+SHORTENED = Counter('shortened_urls_total', 'Total Shortened URLs')
+
+# Database Configuration
+DB_HOST = "db"
 DB_NAME = os.environ.get('POSTGRES_DB', 'urldb')
 DB_USER = os.environ.get('POSTGRES_USER', 'devuser')
 DB_PASS = os.environ.get('POSTGRES_PASSWORD', 'devpassword')
-SHORT_CODE_LENGTH = 6
 
-def get_db_connection():
-    """Establishes a connection to the PostgreSQL database."""
-    try:
-        conn = psycopg2.connect(
-            host=DB_HOST,
-            database=DB_NAME,
-            user=DB_USER,
-            password=DB_PASS
-        )
-        return conn
-    except Exception as e:
-        print(f"Database connection failed: {e}")
-        # In a real app, you'd handle this more gracefully (e.g., retry)
-        return None
 
-def initialize_db():
-    """Creates the 'urls' table if it doesn't exist."""
-    conn = get_db_connection()
-    if conn:
+def is_valid_url(url):
+    # Regex checks for the structure (google.com)
+    # https:// or http:// is optional
+    url_pattern = re.compile(
+        r'^(https?://)?' 
+        r'([a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{2,}' 
+        r'(:[0-9]+)?'
+        r'(/.*)?$', re.IGNORECASE
+    )
+    return re.match(url_pattern, url) is not None
+
+db_pool = None
+
+def get_db_pool():
+    global db_pool
+    if db_pool is None:
         try:
-            cur = conn.cursor()
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS urls (
-                    id SERIAL PRIMARY KEY,
-                    short_code VARCHAR(10) UNIQUE NOT NULL,
-                    long_url TEXT NOT NULL,
-                    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-                );
-            """)
-            conn.commit()
-            cur.close()
+            db_pool = pool.SimpleConnectionPool(
+                1, 20,
+                host=DB_HOST,
+                database=DB_NAME,
+                user=DB_USER,
+                password=DB_PASS
+            )
         except Exception as e:
-            print(f"Error initializing database: {e}")
-        finally:
-            conn.close()
+            print(f"[CRITICAL] Failed to create DB pool: {e}")
+    return db_pool
 
-def generate_short_code(length=SHORT_CODE_LENGTH):
-    """Generates a random short code using letters and numbers."""
-    characters = string.ascii_letters + string.digits
-    return ''.join(random.choice(characters) for _ in range(length))
+def get_conn():
+    p = get_db_pool()
+    return p.getconn() if p else None
 
-# --- Application Endpoints ---
+def release_conn(conn):
+    if db_pool and conn:
+        db_pool.putconn(conn)
 
-
-@app.route('/api/shorten', methods=['POST'])
-def shorten_url():
-    data = request.json
-    long_url = data.get('url')
-
-    if not long_url:
-        return jsonify({"error": "Missing 'url' in request body."}), 400
-
-    conn = get_db_connection()
+# Automatically creates the table on startup
+def init_db():
+   
+    conn = get_conn()
     if not conn:
-        return jsonify({"error": "Database service unavailable."}), 503
+        print("[INFO] Waiting for Database...")
+        return
 
     try:
-        short_code = generate_short_code()
         cur = conn.cursor()
-
-        cur.execute(
-            "INSERT INTO urls (short_code, long_url) VALUES (%s, %s)",
-            (short_code, long_url)
-        )
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS urls (
+                id SERIAL PRIMARY KEY,
+                short_code VARCHAR(10) UNIQUE NOT NULL,
+                long_url TEXT NOT NULL,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            );
+        """)
         conn.commit()
         cur.close()
-
-        # Increment Prometheus counter
-        urls_shortened_counter.inc()
-
-        return jsonify({"short_code": short_code}), 201
-
+        print("[SUCCESS] Database initialized & table checked.")
     except Exception as e:
-        conn.rollback()
-        print(f"Database error during insert: {e}")
-        return jsonify({"error": "Internal database error."}), 500
-
+        print(f"[ERROR] DB Init failed: {e}")
     finally:
-        conn.close()
+        release_conn(conn)
 
+def generate_code(length=6):
+    chars = string.ascii_letters + string.digits
+    return ''.join(random.choices(chars, k=length))
+
+# --- Routes ---
+
+@app.route('/shorten', methods=['POST'])
+def shorten():
+    REQUESTS.inc()
+    data = request.get_json()
+    long_url = data.get('long_url', '').strip()
+
+    if not long_url:
+        return jsonify({"error": "Missing long_url"}), 400
+
+    # Validate the general structure (e.g., google.com)
+    if not is_valid_url(long_url):
+        return jsonify({"error": "Invalid URL format"}), 400
+
+    #If protocol is missing, prepend https://
+    if not long_url.startswith(('http://', 'https://')):
+        long_url = 'https://' + long_url
+
+    conn = get_conn()
+    if not conn: return jsonify({"error": "Database unavailable"}), 503
+
+    try:
+        for _ in range(3):
+            try:
+                code = generate_code()
+                cur = conn.cursor()
+                # Save the FIXED long_url
+                cur.execute("INSERT INTO urls (short_code, long_url) VALUES (%s, %s)", (code, long_url))
+                conn.commit()
+                cur.close()
+                SHORTENED.inc()
+                return jsonify({"short_code": code}), 201
+            except psycopg2.IntegrityError:
+                conn.rollback()
+                continue
+        return jsonify({"error": "Collision error"}), 500
+    finally:
+        release_conn(conn)
 
 @app.route('/<short_code>', methods=['GET'])
 def redirect_url(short_code):
-    """Retrieves the long URL for a given short code and redirects the user."""
-    conn = get_db_connection()
+    REQUESTS.inc()
+    conn = get_conn()
+    
     if not conn:
-        return abort(503) # Service Unavailable
+        return abort(503)
 
     try:
-        # Use a dict cursor for easier access to column names
-        cur = conn.cursor(cursor_factory=extras.DictCursor)
-        cur.execute(
-            "SELECT long_url FROM urls WHERE short_code = %s",
-            (short_code,)
-        )
+        cur = conn.cursor()
+        cur.execute("SELECT long_url FROM urls WHERE short_code = %s", (short_code,))
         record = cur.fetchone()
         cur.close()
 
         if record:
-            long_url = record['long_url']
-            # Perform the HTTP redirect
-            return redirect(long_url, code=302)
-        else:
-            # If short code not found
-            return jsonify({"error": f"Short code '{short_code}' not found."}), 404
+            return redirect(record[0], code=302)
+        return jsonify({"error": "Link not found"}), 404
 
-    except psycopg2.Error as e:
-        print(f"Database error during lookup: {e}")
-        return abort(500)
+    except Exception as e:
+        print(f"[ERROR] Lookup failed: {e}")
+        return jsonify({"error": "Server Error"}), 500
     finally:
-        conn.close()
+        release_conn(conn)
 
-# The /metrics endpoint is automatically added by PrometheusMetrics
+@app.route('/metrics')
+def metrics():
+    return generate_latest(), 200, {'Content-Type': 'text/plain'}
+
+@app.route('/health')
+def health():
+    return jsonify({"status": "healthy", "db_pool": "active" if db_pool else "down"}), 200
 
 if __name__ == '__main__':
-    # Initialize DB (only needed when running locally without Gunicorn startup)
-    initialize_db() 
+    init_db()
     app.run(host='0.0.0.0', port=5000)
