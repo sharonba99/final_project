@@ -18,28 +18,49 @@ function App() {
     setCode('')
     setCopied(false)
     setLoading(true)
+    
+    let cleanUrl = url.trim();
+    if (!/^https?:\/\//i.test(cleanUrl)) {
+      cleanUrl = `https://${cleanUrl}`;
+    }
+
+    setLoading(true)
 
     try {
-      const res = await fetch(`${API_BASE}/shorten`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ long_url: url })
-      })
+    const res = await fetch(`${API_BASE}/shorten`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ long_url: cleanUrl })
+    });
 
-      if (!res.ok) throw new Error('API Error')
-
-      const data = await res.json()
+    // Handle different response scenarios
+    if (!res.ok) {
+      const errorData = await res.json();
       
-      // Store only the short code for display
-      setCode(data.short_code)
+      // Send error if the URL format is invalid
+      if (res.status === 400) {
+        throw new Error("Invalid URL. Please check the format.");
+      }
       
-    } catch (err) {
-      console.error(err)
-      setError('Service unavailable. Is the backend running?')
-    } finally {
-      setLoading(false)
+      throw new Error(errorData.error || 'Something went wrong');
     }
+
+    const data = await res.json();
+    setCode(data.short_code);
+    
+  } catch (err) {
+    console.error(err);
+    // If the error message is specifically from our logic, show it.
+    // Otherwise, assume the backend is down.
+    if (err.message === "Invalid URL. Please check the format.") {
+        setError(err.message);
+    } else {
+        setError('Service unavailable. Is the backend running?');
+    }
+  } finally {
+    setLoading(false);
   }
+};
 
   const handleCopy = () => {
     if (!code) return
@@ -63,10 +84,10 @@ function App() {
         <form onSubmit={handleSubmit}>
           <div className="input-group">
             <input
-              type="url"
+              type="text"
               value={url}
               onChange={(e) => setUrl(e.target.value)}
-              placeholder="https://..."
+              placeholder="google.com"
               required
             />
           </div>
@@ -81,12 +102,8 @@ function App() {
         {code && (
           <div className="result-card">
             <div className="label">Here's your new link:</div>
-            
             <div className="link-display">
-              {/* Display: Just the clean code */}
               <span className="short-link">{code}</span>
-              
-              {/* Action: Copies the full working URL */}
               <button onClick={handleCopy} className="copy-btn">
                 {copied ? 'Copied!' : 'Copy Link'}
               </button>
