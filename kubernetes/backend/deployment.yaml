@@ -26,7 +26,10 @@ spec:
     spec:
       containers:
       - name: backend
-        image: sharonba/url-shortener-frontend:latest
+        image: sharonba/url-shortener-backend:latest
+        env:
+          - name: POSTGRES_HOST
+            value: "database-0.database-headless-service.urlshortener.svc.cluster.local"
         ports:
         - containerPort: 5000
         resources:

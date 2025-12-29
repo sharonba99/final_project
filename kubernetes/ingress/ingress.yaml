@@ -1,16 +1,33 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: app-ingress
+  name: urlshortener-ingress
   namespace: urlshortener
   annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/cors-allow-methods: "PUT, GET, POST, OPTIONS"
+  
 spec:
   ingressClassName: nginx
   rules:
-  - host: urlshortener.com
+  - host: urlshortener.local
     http:
       paths:
+      
+      - path: /shorten
+        pathType: Exact
+        backend:
+          service:
+            name: backend-service
+            port:
+              number: 5000 
+      - path: /r
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: backend-service
+            port:
+              number: 5000
       - path: /
         pathType: Prefix
         backend:
@@ -18,10 +35,5 @@ spec:
             name: frontend-service
             port:
               number: 80
-      - path: /api
-        pathType: Prefix
-        backend:
-          service:
-            name: backend-service
-            port:
-              number: 5000
+
+     

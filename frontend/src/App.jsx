@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import './App.css'
 
-const API_BASE = 'http://localhost:5000'
+const API_BASE = 'http://urlshortener.local'
 
 function App() {
   const [url, setUrl] = useState('')
@@ -27,7 +27,7 @@ function App() {
     setLoading(true)
 
     try {
-    const res = await fetch(`${API_BASE}/shorten`, {
+    const res = await fetch("/shorten", {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ long_url: cleanUrl })
@@ -63,15 +63,24 @@ function App() {
 };
 
   const handleCopy = () => {
-    if (!code) return
+    if (!code) return;
     
-    // Construct the full URL only when copying
-    const fullLink = `${API_BASE}/${code}`
-    navigator.clipboard.writeText(fullLink)
-    
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-  }
+    const fullLink = `${API_BASE}/r/${code}`;
+
+    // Fallback for HTTP (non-secure contexts)
+    const textArea = document.createElement("textarea");
+    textArea.value = fullLink;
+    document.body.appendChild(textArea);
+    textArea.select();
+    try {
+      document.execCommand('copy');
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('Fallback copy failed', err);
+    }
+    document.body.removeChild(textArea);
+  };
 
   return (
     <div className="container">
@@ -103,7 +112,7 @@ function App() {
           <div className="result-card">
             <div className="label">Here's your new link:</div>
             <div className="link-display">
-              <span className="short-link">{code}</span>
+              <span className="short-link">/r/{code}</span>
               <button onClick={handleCopy} className="copy-btn">
                 {copied ? 'Copied!' : 'Copy Link'}
               </button>

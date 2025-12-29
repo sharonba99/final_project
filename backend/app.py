@@ -1,4 +1,5 @@
 import os
+import time
 import random
 import string
 import psycopg2
@@ -8,6 +9,7 @@ from flask_cors import CORS
 from prometheus_client import Counter, generate_latest
 import re
 from urllib.parse import urlparse
+
 app = Flask(__name__)
 
 # Allow all origins so frontend can talk to backend
@@ -18,8 +20,8 @@ REQUESTS = Counter('http_requests_total', 'Total HTTP Requests')
 SHORTENED = Counter('shortened_urls_total', 'Total Shortened URLs')
 
 # Database Configuration
-DB_HOST = "db"
-DB_NAME = os.environ.get('POSTGRES_DB', 'urldb')
+DB_HOST = os.environ.get('POSTGRES_HOST', 'database-headless-service')
+DB_NAME = os.environ.get('POSTGRES_DB', 'hostdb')
 DB_USER = os.environ.get('POSTGRES_USER', 'devuser')
 DB_PASS = os.environ.get('POSTGRES_PASSWORD', 'devpassword')
 
@@ -62,29 +64,40 @@ def release_conn(conn):
 
 # Automatically creates the table on startup
 def init_db():
-   
-    conn = get_conn()
-    if not conn:
-        print("[INFO] Waiting for Database...")
-        return
-
-    try:
-        cur = conn.cursor()
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS urls (
-                id SERIAL PRIMARY KEY,
-                short_code VARCHAR(10) UNIQUE NOT NULL,
-                long_url TEXT NOT NULL,
-                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-            );
-        """)
-        conn.commit()
-        cur.close()
-        print("[SUCCESS] Database initialized & table checked.")
-    except Exception as e:
-        print(f"[ERROR] DB Init failed: {e}")
-    finally:
-        release_conn(conn)
+   def init_db():
+    print(f"[DEBUG] Attempting to init DB at {DB_HOST} as {DB_USER}...")
+    
+    # Retry loop: try 10 times with 5s delay
+    for i in range(10):
+        conn = None
+        try:
+            conn = psycopg2.connect(
+                host=DB_HOST,
+                database=DB_NAME,
+                user=DB_USER,
+                password=DB_PASS,
+                connect_timeout=5
+            )
+            cur = conn.cursor()
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS urls (
+                    id SERIAL PRIMARY KEY,
+                    short_code VARCHAR(10) UNIQUE NOT NULL,
+                    long_url TEXT NOT NULL,
+                    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+                );
+            """)
+            conn.commit()
+            cur.close()
+            print("[SUCCESS] Database initialized & table checked.")
+            conn.close()
+            return # Exit function on success
+        except Exception as e:
+            print(f"[INFO] Connection attempt {i+1} failed: {e}")
+            if conn: conn.close()
+            time.sleep(5)
+    
+    print("[CRITICAL] Could not connect to DB after multiple retries.")
 
 def generate_code(length=6):
     chars = string.ascii_letters + string.digits
@@ -92,8 +105,10 @@ def generate_code(length=6):
 
 # --- Routes ---
 
-@app.route('/shorten', methods=['POST'])
+@app.route('/shorten', methods=['POST', 'OPTIONS'])
 def shorten():
+    if request.method == 'OPTIONS':
+        return '', 204
     REQUESTS.inc()
     data = request.get_json()
     long_url = data.get('long_url', '').strip()
@@ -130,7 +145,7 @@ def shorten():
     finally:
         release_conn(conn)
 
-@app.route('/<short_code>', methods=['GET'])
+@app.route('/r/<short_code>', methods=['GET'])
 def redirect_url(short_code):
     REQUESTS.inc()
     conn = get_conn()
@@ -162,6 +177,10 @@ def metrics():
 def health():
     return jsonify({"status": "healthy", "db_pool": "active" if db_pool else "down"}), 200
 
-if __name__ == '__main__':
+try:
     init_db()
+except Exception as e:
+    print(f"Pre-startup init failed: {e}")
+
+if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
