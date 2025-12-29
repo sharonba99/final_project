@@ -62,12 +62,13 @@ function App() {
   }
 };
 
+  // Copy to clipboard functionality
   const handleCopy = () => {
     if (!code) return;
     
     const fullLink = `${API_BASE}/r/${code}`;
 
-    // Fallback for HTTP (non-secure contexts)
+  
     const textArea = document.createElement("textarea");
     textArea.value = fullLink;
     document.body.appendChild(textArea);

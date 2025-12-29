@@ -27,7 +27,7 @@ DB_PASS = os.environ.get('POSTGRES_PASSWORD', 'devpassword')
 
 
 def is_valid_url(url):
-    # Regex checks for the structure (google.com)
+    # Regex checks for the structure (domain.com)
     # https:// or http:// is optional
     url_pattern = re.compile(
         r'^(https?://)?' 
@@ -67,7 +67,7 @@ def init_db():
    def init_db():
     print(f"[DEBUG] Attempting to init DB at {DB_HOST} as {DB_USER}...")
     
-    # Retry loop: try 10 times with 5s delay
+    # Retry loop in case that DB is not yet ready
     for i in range(10):
         conn = None
         try:
@@ -91,7 +91,7 @@ def init_db():
             cur.close()
             print("[SUCCESS] Database initialized & table checked.")
             conn.close()
-            return # Exit function on success
+            return 
         except Exception as e:
             print(f"[INFO] Connection attempt {i+1} failed: {e}")
             if conn: conn.close()
@@ -105,6 +105,7 @@ def generate_code(length=6):
 
 # --- Routes ---
 
+# Shorten URL path
 @app.route('/shorten', methods=['POST', 'OPTIONS'])
 def shorten():
     if request.method == 'OPTIONS':
@@ -145,6 +146,8 @@ def shorten():
     finally:
         release_conn(conn)
 
+
+# Path to url redirection
 @app.route('/r/<short_code>', methods=['GET'])
 def redirect_url(short_code):
     REQUESTS.inc()
@@ -169,6 +172,7 @@ def redirect_url(short_code):
     finally:
         release_conn(conn)
 
+# Healthiness and metrics probes
 @app.route('/metrics')
 def metrics():
     return generate_latest(), 200, {'Content-Type': 'text/plain'}
