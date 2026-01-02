@@ -40,6 +40,7 @@ pipeline {
                     sh """
                         docker run --rm \
                         -v ${WORKSPACE}/frontend:/app \
+                        -v /app/node_modules \
                         -w /app \
                         -e CI=true \
                         node:18-alpine \
