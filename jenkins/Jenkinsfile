@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     environment {
-        DOCKER_REGISTRY = "sharonba" // Change to your DockerHub username
+        DOCKER_REGISTRY = "sharonba"
         FRONTEND_IMAGE = "${DOCKER_REGISTRY}/url-shortener-frontend"
         BACKEND_IMAGE  = "${DOCKER_REGISTRY}/url-shortener-backend"
         GIT_SHA        = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
@@ -37,6 +37,7 @@ pipeline {
                     
                     echo "Running Frontend Tests..."
                     
+                    // This makes sure the test runs in an environment similar to the Docker container
                     sh """
                         docker run --rm \
                         -v ${WORKSPACE}/frontend:/app \
@@ -54,10 +55,10 @@ pipeline {
             steps {
                 script {
                     echo "Scanning Frontend Image..."
-                    sh "trivy image --exit-code 0 --severity HIGH,CRITICAL ${FRONTEND_IMAGE}:${TAG}"
+                    sh "docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:latest image --severity HIGH,CRITICAL ${FRONTEND_IMAGE}:${TAG}"
                     
                     echo "Scanning Backend Image..."
-                    sh "trivy image --exit-code 0 --severity HIGH,CRITICAL ${BACKEND_IMAGE}:${TAG}"
+                    sh "docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:latest image --severity HIGH,CRITICAL ${BACKEND_IMAGE}:${TAG}"
                 }
             }
         }
@@ -65,7 +66,7 @@ pipeline {
         stage('Push to Registry') {
             steps {
                 script {
-                    // This 'docker-hub-credentials' ID matches what you just created in Jenkins
+                    
                     withCredentials([usernamePassword(credentialsId: '7a839a0d-889a-4cd9-9484-443f95b911c6', 
                                                     passwordVariable: 'PASS', 
                                                     usernameVariable: 'USER')]) {
@@ -86,7 +87,7 @@ pipeline {
                 withCredentials([file(credentialsId: 'k8s-kubeconfig', variable: 'KUBECONFIG')]) {
                     script {
                         echo "Updating Manifests with Tag: ${TAG}"
-                        // Use sed to replace image tags in your YAML files dynamically
+                        
                         sh "sed -i 's|image: ${FRONTEND_IMAGE}:.*|image: ${FRONTEND_IMAGE}:${TAG}|g' k8s/frontend-deployment.yaml"
                         sh "sed -i 's|image: ${BACKEND_IMAGE}:.*|image: ${BACKEND_IMAGE}:${TAG}|g' k8s/backend-deployment.yaml"
                         

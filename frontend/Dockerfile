@@ -6,10 +6,6 @@ RUN npm install
 
 COPY . .
 
-# Test
-#ENV CI=true
-#RUN timeout 5s npm test run
-
 RUN npm run build 
 
 # Serve app with nginx server
