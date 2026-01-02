@@ -5,3 +5,4 @@ psycopg2-binary==2.9.9
 prometheus-flask-exporter==0.23.0
 prometheus-client==0.17.1
 flask-cors
+pytest
