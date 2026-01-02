@@ -87,7 +87,7 @@ pipeline {
                 withCredentials([file(credentialsId: 'k8s-kubeconfig', variable: 'KUBECONFIG')]) {
                     script {
                         echo "Deploying to Kubernetes Cluster..."
-                        sh "kubectl --kubeconfig=${KUBECONFIG} apply -f ./kubernetes/ -n urlshortener"
+                        sh "kubectl --kubeconfig=${KUBECONFIG} apply -f ./kubernetes/ -R -n urlshortener"
                     }
                 }
             }
