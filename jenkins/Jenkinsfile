@@ -44,7 +44,7 @@ pipeline {
                         -w /app \
                         -e CI=true \
                         node:18-alpine \
-                        sh -c "npm install && npm test run --testTimeout=5000 --no-threads"
+                        sh -c "npm install && timeout 5s npm test run"
                     """
                 }
             }
