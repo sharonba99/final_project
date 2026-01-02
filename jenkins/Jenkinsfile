@@ -33,7 +33,7 @@ pipeline {
                 script {
                     echo "Running Backend Tests..."
                     // Example: running pytest inside a temporary container
-                    sh "docker run --rm ${BACKEND_IMAGE}:${TAG} pytest"
+                    sh "docker run --rm ${BACKEND_IMAGE}:${TAG} pytest app.py"
                     
                     echo "Running Frontend Tests..."
                     // Example: running npm test
