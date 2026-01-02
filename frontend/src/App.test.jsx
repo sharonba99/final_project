@@ -1,6 +1,7 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import App from './App';
-
+import { vi } from 'vitest';
+global.fetch = vi.fn();
 
 global.fetch = jest.fn();
 
