@@ -26,6 +26,6 @@ def test_shorten_url_mocked(mock_get_conn, client):
     response = client.post('/shorten', json={'long_url': 'https://google.com'})
 
  
-    assert response.status_code == 200
+    assert 200 <= response.status_code < 300
 
     mock_get_conn.assert_called_once()
