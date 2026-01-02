@@ -1,0 +1,116 @@
+pipeline {
+    agent any
+
+    environment {
+        DOCKER_REGISTRY = "sharonba" // Change to your DockerHub username
+        FRONTEND_IMAGE = "${DOCKER_REGISTRY}/url-shortener-frontend"
+        BACKEND_IMAGE  = "${DOCKER_REGISTRY}/url-shortener-backend"
+        GIT_SHA        = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
+        TAG            = "${BUILD_NUMBER}-${GIT_SHA}"
+    }
+
+    stages {
+        stage('Clone Repository') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Build Images') {
+            steps {
+                script {
+                    echo "Building Frontend Image: ${TAG}"
+                    sh "docker build -t ${FRONTEND_IMAGE}:${TAG} ./frontend"
+                    
+                    echo "Building Backend Image: ${TAG}"
+                    sh "docker build -t ${BACKEND_IMAGE}:${TAG} ./backend"
+                }
+            }
+        }
+
+        stage('Test Applications') {
+            steps {
+                script {
+                    echo "Running Backend Tests..."
+                    // Example: running pytest inside a temporary container
+                    sh "docker run --rm ${BACKEND_IMAGE}:${TAG} pytest"
+                    
+                    echo "Running Frontend Tests..."
+                    // Example: running npm test
+                    sh "docker run --rm ${FRONTEND_IMAGE}:${TAG} npm test -- --watchAll=false"
+                }
+            }
+        }
+
+        stage('Security Scan (Trivy)') {
+            steps {
+                script {
+                    echo "Scanning Frontend Image..."
+                    sh "trivy image --exit-code 0 --severity HIGH,CRITICAL ${FRONTEND_IMAGE}:${TAG}"
+                    
+                    echo "Scanning Backend Image..."
+                    sh "trivy image --exit-code 0 --severity HIGH,CRITICAL ${BACKEND_IMAGE}:${TAG}"
+                }
+            }
+        }
+
+        stage('Push to Registry') {
+            steps {
+                script {
+                    // This 'docker-hub-credentials' ID matches what you just created in Jenkins
+                    withCredentials([usernamePassword(credentialsId: '7a839a0d-889a-4cd9-9484-443f95b911c6', 
+                                                    passwordVariable: 'PASS', 
+                                                    usernameVariable: 'USER')]) {
+                        sh "echo $PASS | docker login -u $USER --password-stdin"
+                        sh "docker push ${FRONTEND_IMAGE}:${TAG}"
+                        sh "docker tag ${FRONTEND_IMAGE}:${TAG} ${FRONTEND_IMAGE}:latest"
+                        sh "docker push ${FRONTEND_IMAGE}:latest"
+                        sh "docker push ${BACKEND_IMAGE}:${TAG}"
+                        sh "docker tag ${BACKEND_IMAGE}:${TAG} ${BACKEND_IMAGE}:latest"
+                        sh "docker push ${BACKEND_IMAGE}:latest"
+                    }
+                }
+            }
+}
+
+        stage('Deploy to K8s') {
+            steps {
+                withCredentials([file(credentialsId: 'k8s-kubeconfig', variable: 'KUBECONFIG')]) {
+                    script {
+                        echo "Updating Manifests with Tag: ${TAG}"
+                        // Use sed to replace image tags in your YAML files dynamically
+                        sh "sed -i 's|image: ${FRONTEND_IMAGE}:.*|image: ${FRONTEND_IMAGE}:${TAG}|g' k8s/frontend-deployment.yaml"
+                        sh "sed -i 's|image: ${BACKEND_IMAGE}:.*|image: ${BACKEND_IMAGE}:${TAG}|g' k8s/backend-deployment.yaml"
+                        
+                        sh "kubectl --kubeconfig=${KUBECONFIG} apply -f k8s/ -n urlshortener"
+                    }
+                }
+            }
+        }
+
+        stage('Health Check') {
+            steps {
+                withCredentials([file(credentialsId: 'k8s-kubeconfig', variable: 'KUBECONFIG')]) {
+                    script {
+                        echo "Waiting for deployments to stabilize..."
+                        sh "kubectl --kubeconfig=${KUBECONFIG} rollout status deployment/frontend-deployment -n urlshortener"
+                        sh "kubectl --kubeconfig=${KUBECONFIG} rollout status deployment/backend-deployment -n urlshortener"
+                        
+                        echo "Verifying API endpoint..."
+                        sh "kubectl --kubeconfig=${KUBECONFIG} exec -n urlshortener deploy/frontend-deployment -- curl -s http://backend-service:5000/shorten || exit 1"
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            sh "docker logout"
+            cleanWs()
+        }
+        failure {
+            echo "Pipeline failed! Check logs for security scan or test failures."
+        }
+    }
+}
