@@ -37,7 +37,7 @@ pipeline {
                     
                     echo "Running Frontend Tests..."
                     
-                    sh "docker run --rm ${FRONTEND_IMAGE}:${TAG} npm test -- --watchAll=false"
+                    sh "docker run --rm ${FRONTEND_IMAGE}:${TAG}"
                 }
             }
         }
