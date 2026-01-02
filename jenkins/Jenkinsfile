@@ -86,12 +86,8 @@ pipeline {
             steps {
                 withCredentials([file(credentialsId: 'k8s-kubeconfig', variable: 'KUBECONFIG')]) {
                     script {
-                        echo "Updating Manifests with Tag: ${TAG}"
-                        
-                        sh "sed -i 's|image: ${FRONTEND_IMAGE}:.*|image: ${FRONTEND_IMAGE}:${TAG}|g' k8s/frontend-deployment.yaml"
-                        sh "sed -i 's|image: ${BACKEND_IMAGE}:.*|image: ${BACKEND_IMAGE}:${TAG}|g' k8s/backend-deployment.yaml"
-                        
-                        sh "kubectl --kubeconfig=${KUBECONFIG} apply -f k8s/ -n urlshortener"
+                        echo "Deploying to Kubernetes Cluster..."
+                        sh "kubectl --kubeconfig=${KUBECONFIG} apply -f kubernetes/ -n urlshortener"
                     }
                 }
             }
