@@ -6,6 +6,8 @@ RUN npm install
 
 COPY . .
 
+
+RUN ls -R src/
 # Test
 ENV CI=true
 RUN npm test -- run
