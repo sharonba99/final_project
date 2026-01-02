@@ -7,7 +7,8 @@ RUN npm install
 COPY . .
 
 # Test
-RUN npm test -- --watchAll=false
+ENV CI=true
+RUN npm test -- run
 
 RUN npm run build 
 
