@@ -37,7 +37,14 @@ pipeline {
                     
                     echo "Running Frontend Tests..."
                     
-                    sh "docker run --rm ${FRONTEND_IMAGE}:${TAG}"
+                    sh """
+                        docker run --rm \
+                        -v ${WORKSPACE}/frontend:/app \
+                        -w /app \
+                        -e CI=true \
+                        node:18-alpine \
+                        sh -c "npm install && npm test run --testTimeout=5000 --no-threads"
+                    """
                 }
             }
         }
