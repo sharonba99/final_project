@@ -10,7 +10,7 @@ COPY . .
 RUN ls -R src/
 # Test
 ENV CI=true
-RUN npm test -- run
+RUN timeout 5s npm test run
 
 RUN npm run build 
 
