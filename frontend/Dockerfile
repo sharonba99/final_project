@@ -8,7 +8,7 @@ COPY . .
 
 # Test
 ENV CI=true
-RUN npm run test
+RUN npm test -- run
 
 RUN npm run build 
 
