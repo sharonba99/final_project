@@ -26,7 +26,7 @@ spec:
     spec:
       containers:
       - name: frontend
-        image: sharonba/url-shortener-frontend:latest
+        image: danieli29/url-shortener-frontend:latest
         ports:
         - containerPort: 80
         resources:
@@ -39,15 +39,16 @@ spec:
         envFrom:
         - configMapRef:
             name: frontend-config
+            
         livenessProbe:
           httpGet:
-            path: /healthz
+            path: /
             port: 80
-          initialDelaySeconds: 5
-          periodSeconds: 10
+          initialDelaySeconds: 10
+          periodSeconds: 15
         readinessProbe:
           httpGet:
-            path: /ready
+            path: /
             port: 80
           initialDelaySeconds: 5
           periodSeconds: 10

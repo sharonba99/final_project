@@ -2,189 +2,163 @@ import os
 import time
 import random
 import string
-import psycopg2
-from psycopg2 import pool, extras
-from flask import Flask, request, jsonify, redirect, abort
-from flask_cors import CORS
-from prometheus_client import Counter, generate_latest
 import re
-from urllib.parse import urlparse
+from flask import Flask, redirect, jsonify, request
+from flask_cors import CORS
+from flask_sqlalchemy import SQLAlchemy
+from flask_migrate import Migrate
+from flask_restful import Api, Resource, reqparse
+from prometheus_client import Counter, Histogram, Gauge, generate_latest
 
 app = Flask(__name__)
+CORS(app)  # Enables Cross-Origin Resource Sharing
 
-# Allow all origins so frontend can talk to backend
-CORS(app)
-
-# Metrics
-REQUESTS = Counter('http_requests_total', 'Total HTTP Requests')
-SHORTENED = Counter('shortened_urls_total', 'Total Shortened URLs')
-
-# Database Configuration
-DB_HOST = os.environ.get('POSTGRES_HOST', 'database-headless-service')
-DB_NAME = os.environ.get('POSTGRES_DB', 'hostdb')
+# --- Database Configuration ---
 DB_USER = os.environ.get('POSTGRES_USER', 'devuser')
 DB_PASS = os.environ.get('POSTGRES_PASSWORD', 'devpassword')
+DB_HOST = os.environ.get('POSTGRES_HOST', 'database-headless-service')
+DB_NAME = os.environ.get('POSTGRES_DB', 'hostdb')
 
+app.config['SQLALCHEMY_DATABASE_URI'] = f"postgresql://{DB_USER}:{DB_PASS}@{DB_HOST}/{DB_NAME}"
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-def is_valid_url(url):
-    # Regex checks for the structure (domain.com)
-    # https:// or http:// is optional
-    url_pattern = re.compile(
-        r'^(https?://)?' 
-        r'([a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{2,}' 
-        r'(:[0-9]+)?'
-        r'(/.*)?$', re.IGNORECASE
-    )
-    return re.match(url_pattern, url) is not None
+db = SQLAlchemy(app)
+migrate = Migrate(app, db)
+api = Api(app)
 
-db_pool = None
+# --- Prometheus Metrics ---
+REQUEST_COUNT = Counter('http_requests_total', 'Total HTTP Requests', ['method', 'endpoint'])
+REQUEST_LATENCY = Histogram('http_request_duration_seconds', 'Request duration', ['endpoint'])
+IN_PROGRESS = Gauge('http_requests_in_progress', 'Requests currently in progress')
+DB_CONNECTIONS = Gauge('db_connections_active', 'Active DB connections')
 
-def get_db_pool():
-    global db_pool
-    if db_pool is None:
-        try:
-            db_pool = pool.SimpleConnectionPool(
-                1, 20,
-                host=DB_HOST,
-                database=DB_NAME,
-                user=DB_USER,
-                password=DB_PASS
-            )
-        except Exception as e:
-            print(f"[CRITICAL] Failed to create DB pool: {e}")
-    return db_pool
+# --- Database Model ---
+class URL(db.Model):
+    __tablename__ = 'urls'
+    id = db.Column(db.Integer, primary_key=True)
+    short_code = db.Column(db.String(10), unique=True, nullable=False)
+    long_url = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, server_default=db.func.now())
 
-def get_conn():
-    p = get_db_pool()
-    return p.getconn() if p else None
-
-def release_conn(conn):
-    if db_pool and conn:
-        db_pool.putconn(conn)
-
-# Automatically creates the table on startup
-def init_db():
-   def init_db():
-    print(f"[DEBUG] Attempting to init DB at {DB_HOST} as {DB_USER}...")
-    
-    # Retry loop in case that DB is not yet ready
-    for i in range(10):
-        conn = None
-        try:
-            conn = psycopg2.connect(
-                host=DB_HOST,
-                database=DB_NAME,
-                user=DB_USER,
-                password=DB_PASS,
-                connect_timeout=5
-            )
-            cur = conn.cursor()
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS urls (
-                    id SERIAL PRIMARY KEY,
-                    short_code VARCHAR(10) UNIQUE NOT NULL,
-                    long_url TEXT NOT NULL,
-                    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-                );
-            """)
-            conn.commit()
-            cur.close()
-            print("[SUCCESS] Database initialized & table checked.")
-            conn.close()
-            return 
-        except Exception as e:
-            print(f"[INFO] Connection attempt {i+1} failed: {e}")
-            if conn: conn.close()
-            time.sleep(5)
-    
-    print("[CRITICAL] Could not connect to DB after multiple retries.")
-
+# --- Helpers ---
 def generate_code(length=6):
     chars = string.ascii_letters + string.digits
     return ''.join(random.choices(chars, k=length))
 
+def is_valid_url(url):
+    pattern = re.compile(r'^(https?://)?([a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{2,}(:[0-9]+)?(/.*)?$', re.IGNORECASE)
+    return bool(pattern.match(url))
+
+# --- Middleware ---
+@app.before_request
+def before_request():
+    request.start_time = time.time()
+    IN_PROGRESS.inc()
+
+@app.after_request
+def after_request(response):
+    request_latency = time.time() - request.start_time
+    IN_PROGRESS.dec()
+    REQUEST_COUNT.labels(request.method, request.endpoint).inc()
+    REQUEST_LATENCY.labels(request.endpoint).observe(request_latency)
+    return response
+
+# --- API Resources ---
+class ShortenAPI(Resource):
+    def post(self):
+        """ Creates a new short link (Create) """
+        parser = reqparse.RequestParser()
+        parser.add_argument('long_url', required=True, help="long_url cannot be blank")
+        args = parser.parse_args()
+        
+        long_url = args['long_url'].strip()
+
+        if not is_valid_url(long_url):
+            return {'error': 'Invalid URL format'}, 400
+
+        if not long_url.startswith(('http://', 'https://')):
+            long_url = 'https://' + long_url
+
+        code = generate_code()
+        retries = 0
+        while URL.query.filter_by(short_code=code).first():
+            if retries > 5: return {'error': 'Server busy'}, 500
+            code = generate_code()
+            retries += 1
+
+        try:
+            new_link = URL(short_code=code, long_url=long_url)
+            db.session.add(new_link)
+            db.session.commit()
+            return {'short_code': code}, 201
+        except Exception as e:
+            db.session.rollback()
+            return {'error': 'Database error'}, 500
+
+class URLAdminAPI(Resource):
+    def delete(self, short_code):
+        """ Deletes a link (Delete - Critical for CRUD requirement) """
+        link = URL.query.filter_by(short_code=short_code).first()
+        if not link:
+            return {'error': 'Not found'}, 404
+        
+        try:
+            db.session.delete(link)
+            db.session.commit()
+            return {'message': 'Deleted successfully'}, 200
+        except:
+            db.session.rollback()
+            return {'error': 'Delete failed'}, 500
+
+api.add_resource(ShortenAPI, '/shorten')
+api.add_resource(URLAdminAPI, '/api/urls/<short_code>')
+
 # --- Routes ---
+@app.route('/<short_code>', methods=['GET'])
+def redirect_to_url(short_code):
+    link = URL.query.filter_by(short_code=short_code).first()
+    if link:
+        return redirect(link.long_url)
+    return jsonify({'error': 'Link not found'}), 404
 
-# Shorten URL path
-@app.route('/shorten', methods=['POST', 'OPTIONS'])
-def shorten():
-    if request.method == 'OPTIONS':
-        return '', 204
-    REQUESTS.inc()
-    data = request.get_json()
-    long_url = data.get('long_url', '').strip()
-
-    if not long_url:
-        return jsonify({"error": "Missing long_url"}), 400
-
-    # Validate the general structure (e.g., google.com)
-    if not is_valid_url(long_url):
-        return jsonify({"error": "Invalid URL format"}), 400
-
-    #If protocol is missing, prepend https://
-    if not long_url.startswith(('http://', 'https://')):
-        long_url = 'https://' + long_url
-
-    conn = get_conn()
-    if not conn: return jsonify({"error": "Database unavailable"}), 503
-
-    try:
-        for _ in range(3):
-            try:
-                code = generate_code()
-                cur = conn.cursor()
-                # Save the FIXED long_url
-                cur.execute("INSERT INTO urls (short_code, long_url) VALUES (%s, %s)", (code, long_url))
-                conn.commit()
-                cur.close()
-                SHORTENED.inc()
-                return jsonify({"short_code": code}), 201
-            except psycopg2.IntegrityError:
-                conn.rollback()
-                continue
-        return jsonify({"error": "Collision error"}), 500
-    finally:
-        release_conn(conn)
-
-
-# Path to url redirection
-@app.route('/r/<short_code>', methods=['GET'])
-def redirect_url(short_code):
-    REQUESTS.inc()
-    conn = get_conn()
-    
-    if not conn:
-        return abort(503)
-
-    try:
-        cur = conn.cursor()
-        cur.execute("SELECT long_url FROM urls WHERE short_code = %s", (short_code,))
-        record = cur.fetchone()
-        cur.close()
-
-        if record:
-            return redirect(record[0], code=302)
-        return jsonify({"error": "Link not found"}), 404
-
-    except Exception as e:
-        print(f"[ERROR] Lookup failed: {e}")
-        return jsonify({"error": "Server Error"}), 500
-    finally:
-        release_conn(conn)
-
-# Healthiness and metrics probes
+# --- Health & Metrics ---
 @app.route('/metrics')
 def metrics():
+    try:
+        DB_CONNECTIONS.set(1) 
+    except:
+        DB_CONNECTIONS.set(0)
     return generate_latest(), 200, {'Content-Type': 'text/plain'}
 
 @app.route('/health')
-def health():
-    return jsonify({"status": "healthy", "db_pool": "active" if db_pool else "down"}), 200
+def health_basic():
+    return jsonify({"status": "healthy"}), 200
 
-try:
-    init_db()
-except Exception as e:
-    print(f"Pre-startup init failed: {e}")
+@app.route('/health/live')
+def health_liveness():
+    return jsonify({"status": "alive"}), 200
+
+@app.route('/health/ready')
+def health_readiness():
+    try:
+        db.session.execute(db.text('SELECT 1'))
+        return jsonify({"status": "ready", "db": "connected"}), 200
+    except Exception as e:
+        return jsonify({"status": "not ready", "error": str(e)}), 503
+
+# --- Initialization ---
+def init_db_with_retry():
+    with app.app_context():
+        for i in range(10):
+            try:
+                db.create_all()
+                print(f"[INFO] DB initialized successfully on attempt {i+1}.")
+                return
+            except Exception as e:
+                time.sleep(2)
+        print("[CRITICAL] DB Init failed.")
+
+init_db_with_retry()
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)

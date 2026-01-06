@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import './App.css'
 
-const API_BASE = 'http://urlshortener.local'
+// Dynamically determine the API base URL from the current browser location.
+const API_BASE = window.location.origin;
 
 function App() {
   const [url, setUrl] = useState('')
