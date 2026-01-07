@@ -54,12 +54,13 @@ pipeline {
         stage('Security Scan (Trivy)') {
             steps {
                 script {
+                    // Running Trivy from a docker image
                     echo "Scanning Frontend Image..."
                     sh "docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:latest image --severity HIGH,CRITICAL ${FRONTEND_IMAGE}:${TAG}"
                     
                     echo "Scanning Backend Image..."
                     sh "docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:latest image --severity HIGH,CRITICAL ${BACKEND_IMAGE}:${TAG}"
-                }
+                }1.2.0
             }
         }
 
