@@ -60,7 +60,7 @@ pipeline {
                     
                     echo "Scanning Backend Image..."
                     sh "docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:latest image --severity HIGH,CRITICAL ${BACKEND_IMAGE}:${TAG}"
-                }1.2.0
+                }
             }
         }
 
