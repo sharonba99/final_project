@@ -44,15 +44,17 @@ spec:
             name: backend-config
         - secretRef:
             name: database-secret
-        # livenessProbe:
-        #   httpGet:
-        #     path: /healthz
-        #     port: 5000
-        #   initialDelaySeconds: 10
-        #   periodSeconds: 15
-        # readinessProbe:
-        #   httpGet:
-        #     path: /ready
-        #     port: 5000
-        #   initialDelaySeconds: 10
-        #   periodSeconds: 15
+     
+        livenessProbe:
+          httpGet:
+            path: /health/live
+            port: 5000
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health/ready
+            port: 5000
+          initialDelaySeconds: 15
+          periodSeconds: 5
+          timeoutSeconds: 3

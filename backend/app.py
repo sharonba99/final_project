@@ -157,9 +157,33 @@ def redirect_url(short_code):
 def metrics():
     return generate_latest(), 200, {'Content-Type': 'text/plain'}
 
-@app.route('/health')
-def health():
-    return jsonify({"status": "healthy"}), 200
+@app.route('/health', methods=['GET'])
+def health_basic():
+    """Basic health check - just confirms the web server is responding."""
+    return jsonify({"status": "up", "timestamp": time.time()}), 200
+
+@app.route('/health/live', methods=['GET'])
+def health_live():
+    """Liveness check - confirms the process is alive."""
+    return jsonify({"status": "live"}), 200
+
+@app.route('/health/ready', methods=['GET'])
+def health_ready():
+    """Readiness check - confirms the DB connection is actually working."""
+    try:
+        # We try to get a connection from the pool
+        conn = get_conn()
+        if conn:
+            # Simple query to verify DB responsiveness
+            cur = conn.cursor()
+            cur.execute("SELECT 1")
+            cur.close()
+            release_conn(conn)
+            return jsonify({"status": "ready", "database": "connected"}), 200
+        else:
+            return jsonify({"status": "not ready", "database": "no connection pool"}), 503
+    except Exception as e:
+        return jsonify({"status": "not ready", "database": str(e)}), 503
 
 # Perform the table check outside the main loop
 init_db()

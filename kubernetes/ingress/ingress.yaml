@@ -6,14 +6,21 @@ metadata:
   annotations:
     nginx.ingress.kubernetes.io/enable-cors: "true"
     nginx.ingress.kubernetes.io/cors-allow-methods: "PUT, GET, POST, OPTIONS"
-  
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+
 spec:
   ingressClassName: nginx
   rules:
   - host: urlshortener.local
     http:
       paths:
-      
+      - path: /health
+        pathType: Prefix
+        backend:
+          service:
+            name: backend-service
+            port:
+              number: 5000
       - path: /shorten
         pathType: Exact
         backend:
