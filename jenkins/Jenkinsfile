@@ -89,7 +89,7 @@ pipeline {
                     script {
                         echo "Deploying to Kubernetes Cluster..."
                         sh "kubectl create namespace urlshortener || true"
-                        sh "kubectl --kubeconfig=${KUBECONFIG} apply -f ./kubernetes/ -R -n urlshortener"
+                        sh 'kubectl --kubeconfig=${KUBECONFIG} apply -f ./kubernetes/ -R -n urlshortener'
                     }
                 }
             }
@@ -100,12 +100,12 @@ pipeline {
                 withCredentials([file(credentialsId: 'k8s-kubeconfig', variable: 'KUBECONFIG')]) {
                     script {
                         echo "Waiting for deployments to stabilize..."
-                        sh "kubectl --kubeconfig=${KUBECONFIG} rollout status deployment/frontend-deployment -n urlshortener --timeout=90s"
-                        sh "kubectl --kubeconfig=${KUBECONFIG} rollout status deployment/backend-deployment -n urlshortener --timeout=90s"
+                        sh 'kubectl --kubeconfig=${KUBECONFIG} rollout status deployment/frontend-deployment -n urlshortener --timeout=90s'
+                        sh 'kubectl --kubeconfig=${KUBECONFIG} rollout status deployment/backend-deployment -n urlshortener --timeout=90s'
 
                         echo "Readiness and liveness"
-                        sh "kubectl --kubeconfig=${KUBECONFIG} exec -n urlshortener deploy/frontend-deployment -- curl -f http://backend-service:5000/health/ready || exit 1"
-                        sh "kubectl --kubeconfig=${KUBECONFIG} exec -n urlshortener deploy/frontend-deployment -- curl -f http://backend-service:5000/health/live || exit 1"
+                        sh 'kubectl --kubeconfig=${KUBECONFIG} exec -n urlshortener deploy/frontend-deployment -- curl -f http://backend-service:5000/health/ready || exit 1'
+                        sh 'kubectl --kubeconfig=${KUBECONFIG} exec -n urlshortener deploy/frontend-deployment -- curl -f http://backend-service:5000/health/live || exit 1'
                     }
                 }
             }
