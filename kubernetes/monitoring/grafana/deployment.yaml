@@ -16,6 +16,7 @@ spec:
       labels:
         app: grafana
     spec:
+      serviceAccountName: grafana-serviceaccount
       securityContext:
         fsGroup: 472 
       containers:
@@ -23,6 +24,23 @@ spec:
         image: grafana/grafana:10.2.3 
         ports:
         - containerPort: 3000
+        env:
+          - name: GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH
+            value: "/var/lib/grafana/dashboards/app-metrics.json" 
+        volumeMounts:
+        - name: grafana-persistent-storage
+          mountPath: /var/lib/grafana
+
+        - name: sc-dashboard-volume
+          mountPath: /var/lib/grafana/dashboards
+
+        - name: dashboard-provider-volume
+          mountPath: /etc/grafana/provisioning/dashboards/provider.yaml
+          subPath: provider.yaml
+          
+        - name: sc-datasource-volume 
+          mountPath: /etc/grafana/provisioning/datasources
+
         resources:
           limits:
             cpu: "500m"
@@ -30,9 +48,52 @@ spec:
           requests:
             cpu: "100m"
             memory: "100Mi"
+      
+      - name: grafana-sc-dashboard
+        image: kiwigrid/k8s-sidecar:latest
+        env:
+          - name: LABEL
+            value: "grafana_dashboard"
+          - name: FOLDER
+            value: "/tmp/dashboards"
+          - name: RESOURCE
+            value: "configmap"
         volumeMounts:
-        - name: grafana-persistent-storage
-          mountPath: /var/lib/grafana
+        - name: sc-dashboard-volume
+          mountPath: /tmp/dashboards
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 100m
+            memory: 128Mi
+      - name: grafana-sc-datasources
+        image: kiwigrid/k8s-sidecar:latest
+        env:
+          - name: LABEL
+            value: "grafana_datasource" 
+          - name: FOLDER
+            value: "/etc/grafana/provisioning/datasources"
+          - name: RESOURCE
+            value: "configmap"
+        volumeMounts:
+        - name: sc-datasource-volume
+          mountPath: "/etc/grafana/provisioning/datasources"
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 100m
+            memory: 128Mi
       volumes:
       - name: grafana-persistent-storage
-        emptyDir: {} # Using emptyDir for simplicity; replace with a PVC for persistence.
+        emptyDir: {} 
+      - name: sc-dashboard-volume
+        emptyDir: {}
+      - name: dashboard-provider-volume
+        configMap:
+          name: grafana-dashboards-provider
+      - name: sc-datasource-volume
+        emptyDir: {}

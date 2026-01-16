@@ -5,7 +5,7 @@ COPY package.json ./
 RUN npm install
 
 COPY . .
-
+# Build the app
 RUN npm run build 
 
 # Serve app with nginx server

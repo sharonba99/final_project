@@ -20,7 +20,6 @@ services:
       POSTGRES_DB: urldb
       POSTGRES_USER: devuser
       POSTGRES_PASSWORD: devpassword
-      # Allow the backend to be directly accessible for debugging
     ports:
       - "5000:5000"
     depends_on:
@@ -31,7 +30,6 @@ services:
       context: ./frontend
     container_name: url_react_frontend
     environment:
-      # CRITICAL: This links the frontend to the backend service name in the Docker network
       VITE_API_BASE_URL: http://backend:5000 
     ports:
       - "8081:80"

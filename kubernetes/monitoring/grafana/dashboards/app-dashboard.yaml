@@ -1,0 +1,56 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-app-dashboard
+  namespace: urlshortener
+  labels:
+    grafana_dashboard: "1" 
+data:
+  app-dashboard.json: |-
+    {
+      "title": "URL Shortener - Application Metrics",
+      "tags": ["url-shortener", "backend"],
+      "timezone": "browser",
+      "schemaVersion": 36,
+      "panels": [
+        {
+          "title": "Request Rate",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+          "targets": [
+            { "expr": "sum(rate(http_requests_total[5m])) by (http_status)", "legendFormat": "Status {{http_status}}" }
+          ]
+        },
+        {
+          "title": "Error Rate (5xx)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+          "targets": [
+            { "expr": "sum(rate(http_requests_total{http_status=~\"5..\"}[5m]))", "legendFormat": "Errors" }
+          ]
+        },
+        {
+          "title": "Response Time (p50, p95, p99)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 24, "x": 0, "y": 8 },
+          "fieldConfig": { "defaults": { "unit": "s" } },
+          "targets": [
+            { "expr": "histogram_quantile(0.50, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p50 (Median)" },
+            { "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p95" },
+            { "expr": "histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p99" }
+          ]
+        },
+        {
+          "title": "Active DB Connections",
+          "type": "gauge",
+          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 16 },
+          "targets": [ { "expr": "db_connections_active" } ]
+        },
+        {
+            "title": "Total Shortened URLs",
+            "type": "stat",
+            "gridPos": { "h": 8, "w": 8, "x": 8, "y": 16 },
+            "targets": [ { "expr": "shortened_urls_total" } ]
+        }
+      ]
+    }

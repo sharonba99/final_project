@@ -45,6 +45,7 @@ spec:
         - secretRef:
             name: database-secret
      
+     # Health and readiness probes
         livenessProbe:
           httpGet:
             path: /health/live

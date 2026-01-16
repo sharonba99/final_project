@@ -1,0 +1,81 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-k8s-dashboard
+  namespace: urlshortener
+  labels:
+    grafana_dashboard: "1" 
+data:
+  k8s-dashboard.json: |-
+    {
+      "title": "Kubernetes Global View (Fixed)",
+      "uid": "k8s_global_v2",
+      "schemaVersion": 39,
+      "refresh": "30s",
+      "panels": [
+        {
+          "title": "Pod Status (Running vs Pending vs Failed)",
+          "type": "stat",
+          "gridPos": { "h": 6, "w": 8, "x": 0, "y": 0 },
+          "datasource": { "type": "prometheus", "uid": "prometheus_ds" },
+          "targets": [
+            { "expr": "sum(kube_pod_status_phase) by (phase)", "legendFormat": "{{phase}}" }
+          ],
+          "options": { "colorMode": "background", "graphMode": "area" }
+        },
+        {
+          "title": "Deployment Status (Available Replicas)",
+          "type": "gauge",
+          "gridPos": { "h": 6, "w": 8, "x": 8, "y": 0 },
+          "datasource": { "type": "prometheus", "uid": "prometheus_ds" },
+          "targets": [
+            { "expr": "sum(kube_deployment_status_replicas_available)", "legendFormat": "Available" },
+            { "expr": "sum(kube_deployment_spec_replicas)", "legendFormat": "Desired" }
+          ]
+        },
+        {
+          "title": "Node Health (Ready Status)",
+          "type": "stat",
+          "gridPos": { "h": 6, "w": 8, "x": 16, "y": 0 },
+          "datasource": { "type": "prometheus", "uid": "prometheus_ds" },
+          "targets": [
+            { "expr": "sum(kube_node_status_condition{condition=\"Ready\",status=\"true\"})", "legendFormat": "Nodes Ready" }
+          ],
+          "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "green" } } }
+        },
+        {
+          "title": "Cluster CPU Usage (Requests vs Limits)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
+          "datasource": { "type": "prometheus", "uid": "prometheus_ds" },
+          "targets": [
+            { "expr": "sum(node_namespace_pod_container:container_cpu_usage_seconds_total:sum_irate)", "legendFormat": "Usage" },
+            { "expr": "sum(kube_pod_container_resource_requests{resource=\"cpu\"})", "legendFormat": "Requests" },
+            { "expr": "sum(kube_pod_container_resource_limits{resource=\"cpu\"})", "legendFormat": "Limits" }
+          ]
+        },
+        {
+          "title": "Cluster RAM Usage (Requests vs Limits)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 },
+          "datasource": { "type": "prometheus", "uid": "prometheus_ds" },
+          "targets": [
+            { "expr": "sum(container_memory_working_set_bytes)", "legendFormat": "Usage" },
+            { "expr": "sum(kube_pod_container_resource_requests{resource=\"memory\"})", "legendFormat": "Requests" },
+            { "expr": "sum(kube_pod_container_resource_limits{resource=\"memory\"})", "legendFormat": "Limits" }
+          ],
+          "fieldConfig": { "defaults": { "unit": "bytes" } }
+        }
+      ],
+      "templating": {
+        "list": [
+          {
+            "name": "datasource",
+            "type": "datasource",
+            "query": "prometheus",
+            "label": "Data Source",
+            "hide": 2
+          }
+        ]
+      }
+    }

@@ -117,7 +117,7 @@ pipeline {
             cleanWs()
         }
         failure {
-            echo "Pipeline failed! Check logs for security scan or test failures."
+            echo "Pipeline failed. Check the logs."
         }
     }
 }

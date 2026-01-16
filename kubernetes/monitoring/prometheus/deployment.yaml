@@ -37,10 +37,9 @@ spec:
         - name: prometheus-storage
           mountPath: /prometheus
       volumes:
-      # Volume for ConfigMap holding the Prometheus configuration file
       - name: prometheus-config-volume
         configMap:
-          name: prometheus-config # NOTE: You need to create this ConfigMap
+          name: prometheus-config 
      
       - name: prometheus-storage
         emptyDir: {}

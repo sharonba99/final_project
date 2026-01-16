@@ -8,66 +8,95 @@ metadata:
 data:
   prometheus.yml: |
     global:
-      # How often Prometheus will scrape targets by default
       scrape_interval: 15s 
-      # How long targets are marked as down before alerts are sent
       evaluation_interval: 15s
 
-    # Rule files to load
     rule_files:
-      # - '/etc/prometheus/rules/*.yml' # Placeholder for alert rules
+      - /etc/prometheus/alert_rules.yml
 
     scrape_configs:
-      # 1. Prometheus Scrape (Scraping itself)
+      - job_name: 'kubernetes-nodes'
+        scheme: https
+        tls_config:
+          ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+          insecure_skip_verify: true # Kubelet certs are usually self-signed
+        bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+        kubernetes_sd_configs:
+          - role: node
+        relabel_configs:
+          - action: labelmap
+            regex: __meta_kubernetes_node_label_(.+)
+          - target_label: __address__
+            replacement: kubernetes.default.svc:443
+          - source_labels: [__meta_kubernetes_node_name]
+            regex: (.+)
+            target_label: __metrics_path__
+            replacement: /api/v1/nodes/${1}/proxy/metrics/cadvisor
+
       - job_name: 'prometheus'
-        # Targets are defined statically
         static_configs:
           - targets: ['localhost:9090']
 
-      # 2. Kubernetes Service Endpoints (For the cluster components)
       - job_name: 'kubernetes-apiservers'
         kubernetes_sd_configs:
           - role: endpoints
-        # Filter to only scrape the default/kubernetes endpoints
+        scheme: https
+        tls_config:
+          ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+          insecure_skip_verify: true
+        bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
         relabel_configs:
           - source_labels: [__meta_kubernetes_namespace, __meta_kubernetes_service_name, __meta_kubernetes_endpoint_port_name]
             regex: default;kubernetes;https
             action: keep
-        scheme: https
-        # Required for scraping the secure Kubernetes API server
-        tls_config:
-          ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
-        
-        # Disable certificate verification (if using self-signed certs)
-          insecure_skip_verify: true
-        bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
 
-      # 3. Pod Scrape (Discovering Frontend/Backend application pods)
       - job_name: 'kubernetes-pods'
         kubernetes_sd_configs:
           - role: pod
             namespaces:
-              names: ['urlshortener'] # Only look in our namespace
-        
-        # Keep only the pods that have the 'prometheus.io/scrape' annotation set to 'true'
+              names: ['urlshortener']
         relabel_configs:
-          # Keep only pods with the scrape annotation
+          # 1. Only scrape pods with the annotation: prometheus.io/scrape: "true"
           - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
             action: keep
             regex: true
-          # Define the target port from the annotation or default to 8080
-          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_port]
-            action: replace
-            target_label: __address__
-            regex: (.+):.+$
-            replacement: $1:$$1
-          - source_labels: [__meta_kubernetes_pod_ip, __meta_kubernetes_pod_annotation_prometheus_io_port]
-            action: replace
-            target_label: __address__
-            regex: (.+);(\d+)
-            replacement: $1:$2
-          # Replace the default metric path with the one from the annotation, or use /metrics
+
+          # 2. Set metrics path from annotation (default to /metrics)
           - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
             action: replace
             target_label: __metrics_path__
             regex: (.+)
+
+          # 3. Set address/port from annotation (default to port 5000)
+          - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+            action: replace
+            regex: ([^:]+)(?::\d+)?;(\d+)
+            replacement: $1:$2
+            target_label: __address__
+
+          # 4. Make Kubernetes labels available as Prometheus labels
+          - action: labelmap
+            regex: __meta_kubernetes_pod_label_(.+)
+
+  # Alerts
+  alert_rules.yml: |
+    groups:
+    - name: url_shortener_alerts
+      rules:
+      - alert: HighCpuUsage
+        expr: container_cpu_usage_seconds_total > 0.8
+        for: 2m
+        annotations:
+          summary: "High CPU usage on {{ $labels.pod }}"
+      
+      - alert: APIErrorsHigh
+        expr: rate(http_requests_total{http_status=~"5.."}[5m]) > 0.05
+        for: 1m
+        annotations:
+          summary: "API Error rate is above 5% on {{ $labels.instance }}"
+
+      - alert: DatabaseConnectionIssues
+        expr: db_connections_active == 0
+        for: 30s
+        annotations:
+          summary: "Backend cannot reach Database"
