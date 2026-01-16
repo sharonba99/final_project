@@ -1,6 +1,7 @@
 import pytest
 from app import app
 from unittest.mock import patch, MagicMock
+import psycopg2
 
 @pytest.fixture
 def client():
