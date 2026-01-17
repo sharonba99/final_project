@@ -7,14 +7,14 @@ metadata:
   labels:
     grafana_datasource: "1" 
 data:
-  prometheus-ds.yaml: |-
+  prometheus.yaml: |-
     apiVersion: 1
     datasources:
-    - name: Prometheus
+    - name: prometheus_ds
       type: prometheus
       uid: prometheus_ds
       access: proxy
-      url: http://prometheus-service.urlshortener:9090
+      url: http://prometheus-service.urlshortener.svc.cluster.local:9090
       isDefault: true
       jsonData:
         timeInterval: "15s"
@@ -37,61 +37,7 @@ data:
       type: file
       disableDeletion: false
       editable: true
+      allowUiUpdates: true
       options:
         path: /var/lib/grafana/dashboards
-
----
-
-# Application Metrics Dashboard
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: grafana-app-dashboard-config
-  namespace: urlshortener
-  labels:
-    grafana_dashboard: "1" 
-data:
-  app-metrics.json: |-
-    {
-      "title": "URL Shortener - Application Metrics",
-      "refresh": "5s",
-      "schemaVersion": 36,
-      "panels": [
-        {
-          "title": "Request Rate",
-          "type": "timeseries",
-          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
-          "targets": [{ "expr": "sum(rate(http_requests_total[1m])) by (http_status)", "legendFormat": "Status {{http_status}}" }]
-        },
-        {
-          "title": "Error Rate (5xx)",
-          "type": "timeseries",
-          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
-          "targets": [{ "expr": "sum(rate(http_requests_total{http_status=~\"5..\"}[1m]))", "legendFormat": "5xx Errors" }]
-        },
-        {
-          "title": "Response Time (p50, p95, p99)",
-          "type": "timeseries",
-          "gridPos": {"h": 8, "w": 24, "x": 0, "y": 8},
-          "fieldConfig": {"defaults": {"unit": "s"}},
-          "targets": [
-            { "expr": "histogram_quantile(0.50, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p50 (Median)" },
-            { "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p95" },
-            { "expr": "histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p99" }
-          ]
-        },
-        {
-          "title": "Active DB Connections",
-          "type": "gauge",
-          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
-          "targets": [{ "expr": "db_connections_active" }]
-        },
-        {
-          "title": "Requests In-Progress",
-          "type": "stat",
-          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
-          "targets": [{ "expr": "http_requests_in_progress" }]
-        }
-      ]
-    }
 

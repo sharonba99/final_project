@@ -37,7 +37,7 @@ pipeline {
                     
                     echo "Running Frontend Tests..."
                     
-                    // This makes sure the test runs in an environment similar to the Docker container
+                    // This makes sure the test runs in an environment similar to the frontend Docker container
                     sh """
                         docker run --rm \
                         -v ${WORKSPACE}/frontend:/app \

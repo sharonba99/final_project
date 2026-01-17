@@ -8,7 +8,7 @@ metadata:
 data:
   k8s-dashboard.json: |-
     {
-      "title": "Kubernetes Global View (Fixed)",
+      "title": "Kubernetes Global View",
       "uid": "k8s_global_v2",
       "schemaVersion": 39,
       "refresh": "30s",

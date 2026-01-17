@@ -6,8 +6,7 @@ import psycopg2
 from psycopg2 import pool
 from flask import Flask, request, jsonify, redirect, abort
 from flask_cors import CORS
-from prometheus_client import Counter, generate_latest, Histogram, Gauge # Added Histogram and Gauge
-import re
+from prometheus_client import Counter, generate_latest, Histogram, Gauge 
 
 app = Flask(__name__)
 CORS(app)

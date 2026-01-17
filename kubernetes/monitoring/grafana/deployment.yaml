@@ -37,9 +37,10 @@ spec:
         - name: dashboard-provider-volume
           mountPath: /etc/grafana/provisioning/dashboards/provider.yaml
           subPath: provider.yaml
-          
+        
         - name: sc-datasource-volume 
-          mountPath: /etc/grafana/provisioning/datasources
+          mountPath: /etc/grafana/provisioning/datasources/prometheus.yaml
+          subPath: prometheus.yaml
 
         resources:
           limits:
@@ -55,31 +56,16 @@ spec:
           - name: LABEL
             value: "grafana_dashboard"
           - name: FOLDER
-            value: "/tmp/dashboards"
+            value: "/var/lib/grafana/dashboards"
           - name: RESOURCE
             value: "configmap"
+          - name: NAMESPACE
+            value: "urlshortener"
+          - name: HTTP_PORT
+            value: "8081"
         volumeMounts:
         - name: sc-dashboard-volume
-          mountPath: /tmp/dashboards
-        resources:
-          requests:
-            cpu: 50m
-            memory: 64Mi
-          limits:
-            cpu: 100m
-            memory: 128Mi
-      - name: grafana-sc-datasources
-        image: kiwigrid/k8s-sidecar:latest
-        env:
-          - name: LABEL
-            value: "grafana_datasource" 
-          - name: FOLDER
-            value: "/etc/grafana/provisioning/datasources"
-          - name: RESOURCE
-            value: "configmap"
-        volumeMounts:
-        - name: sc-datasource-volume
-          mountPath: "/etc/grafana/provisioning/datasources"
+          mountPath: /var/lib/grafana/dashboards
         resources:
           requests:
             cpu: 50m
@@ -96,4 +82,5 @@ spec:
         configMap:
           name: grafana-dashboards-provider
       - name: sc-datasource-volume
-        emptyDir: {}
+        configMap:
+          name: grafana-datasource-config
