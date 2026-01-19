@@ -6,7 +6,7 @@ It features a microservices architecture deployed on Minikube using Terraform an
 ---
 
 ## Project Structure
-
+```
 ├── backend
 │   ├── app.py
 │   ├── Dockerfile
@@ -68,7 +68,7 @@ It features a microservices architecture deployed on Minikube using Terraform an
     │       ├── outputs.tf
     │       └── variables.tf
     └── outputs.tf
----
+```
 
 ## Local Development Environment
 
