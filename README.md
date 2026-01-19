@@ -79,11 +79,15 @@ It features a microservices architecture deployed on Minikube using Terraform an
       brew install minikube
       
       # Linux 
-       curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
-       sudo install minikube-linux-amd64 /usr/local/bin/minikube
+      curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
+      sudo install minikube-linux-amd64 /usr/local/bin/minikube
 
       # Windows
       choco install minikube
+
+      In order to access the URL you need to add it to /etc/hosts
+      First do the command minikube ip and put the output in the file
+      192.168.9.1 urlshortener.local
   ```
 * **Helm** (for Monitoring Stack)
 * **Terraform** executable
