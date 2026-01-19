@@ -89,7 +89,6 @@ It features a microservices architecture deployed on Minikube using Terraform an
       First do the command minikube ip and put the output in the file
       192.168.9.1 urlshortener.local
   ```
-* **Helm** (for Monitoring Stack)
 * **Terraform** executable
 
 ### 2. Infrastructure (Terraform)
