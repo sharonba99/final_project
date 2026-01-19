@@ -12,11 +12,12 @@ import re
 app = Flask(__name__)
 CORS(app)
 
-# --- Prometheus Metrics ---
-# 1. Total Requests (Counter) - Added labels for better filtering
+# Prometheus Metrics
+
+# Total Requests
 REQUESTS = Counter('http_requests_total', 'Total HTTP Requests', ['method', 'endpoint', 'http_status'])
 
-# 2. Request Duration (Histogram)
+# Request Duration
 REQUEST_DURATION = Histogram(
     'http_request_duration_seconds', 
     'Time spent processing request', 
@@ -24,17 +25,16 @@ REQUEST_DURATION = Histogram(
     buckets=(.05, .1, .25, .5, 1, 2.5, 5, 10)
 )
 
-# 3. Requests in Progress (Gauge)
+# Requests in Progress
 IN_PROGRESS = Gauge('http_requests_in_progress', 'Total requests currently being processed')
 
-# 4. Active DB Connections (Gauge)
+# Total DB Connections
 DB_CONNECTIONS = Gauge('db_connections_active', 'Current active database connections')
 
-# 5. Total Shortened URLs (Counter)
+# Total Shortened URLs
 SHORTENED = Counter('shortened_urls_total', 'Total Shortened URLs')
 
-# --- Metrics Management Hooks ---
-# This ensures IN_PROGRESS is always balanced and never goes below zero
+# Metrics hooks
 @app.before_request
 def start_request_tracking():
     if not request.path.startswith('/health') and request.path != '/metrics':
@@ -82,7 +82,7 @@ def get_conn():
     p = get_db_pool()
     if p:
         conn = p.getconn()
-        DB_CONNECTIONS.set(len(p._used)) 
+        DB_CONNECTIONS.set(len(p._used))
         return conn
     return None
 
@@ -94,6 +94,7 @@ def release_conn(conn):
         if db_pool:
             DB_CONNECTIONS.set(len(db_pool._used))
 
+# Database Connection
 def init_db():
     print(f"[DEBUG] Attempting to init DB at {DB_HOST}...")
     for i in range(15):
@@ -129,6 +130,7 @@ def generate_code(length=6):
     chars = string.ascii_letters + string.digits
     return ''.join(random.choices(chars, k=length))
 
+# URL shortening logic
 @app.route('/shorten', methods=['POST', 'OPTIONS'])
 def shorten():
     if request.method == 'OPTIONS':
@@ -182,6 +184,7 @@ def shorten():
         finally:
             release_conn(conn)
 
+# Redirect logic
 @app.route('/r/<short_code>', methods=['GET'])
 def redirect_url(short_code):
     with REQUEST_DURATION.labels(endpoint='/redirect').time():
@@ -207,6 +210,8 @@ def redirect_url(short_code):
 def metrics():
     return generate_latest(), 200, {'Content-Type': 'text/plain'}
 
+
+# Health, Liveness, Readiness checks
 @app.route('/health', methods=['GET'])
 def health_basic():
     return jsonify({"status": "up", "timestamp": time.time()}), 200

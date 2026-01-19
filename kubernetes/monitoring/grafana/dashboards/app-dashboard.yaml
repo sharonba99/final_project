@@ -14,12 +14,26 @@ data:
       "schemaVersion": 36,
       "panels": [
         {
-          "title": "Request Rate",
+          "title": "Request Activity",
           "type": "timeseries",
           "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
           "datasource": { "type": "prometheus", "uid": "prometheus_ds" },
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "drawStyle": "line",
+                "lineInterpolation": "smooth",
+                "spanNulls": true,
+                "fillOpacity": 20
+              },
+              "unit": "req"
+            }
+          },
           "targets": [
-            { "expr": "sum(rate(http_requests_total[1m])) by (http_status)", "legendFormat": "Request rate" }
+            { 
+              "expr": "sum(increase(http_requests_total[1m])) by (http_status) or (vector(0))", 
+              "legendFormat": "HTTP {{http_status}}" 
+            }
           ]
         },
         {
@@ -57,22 +71,38 @@ data:
             }
           ]
         },
-        {
-          "title": "Active DB Connections",
+      {
+          "title": "Active backend pods",
           "type": "gauge",
           "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
           "datasource": { "type": "prometheus", "uid": "prometheus_ds" },
-          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 16 },
-          "targets": [ { "expr": "sum(db_connections_active)" } ]
+          "fieldConfig": {
+            "defaults": {
+              "min": 0,
+              "max": 50,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {"color": "green", "value": null},
+                  {"color": "orange", "value": 20},
+                  {"color": "red", "value": 40}
+                ]
+              }
+            }
+          },
+          "targets": [
+            { 
+              "expr": "count(kube_pod_status_phase{namespace=\"urlshortener\", pod=~\"backend-.*\", phase=\"Running\"} == 1)", "legendFormat": "Active backend pods" 
+            }
+          ]
         },
         {
             "title": "Total Shortened URLs",
             "type": "stat",
             "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
             "datasource": { "type": "prometheus", "uid": "prometheus_ds" },
-            "gridPos": { "h": 8, "w": 8, "x": 8, "y": 16 },
             "targets": [ 
-              { "expr": "max(shortened_urls_total) by (app)", "legendFormat": "Total URLs" } 
+              { "expr": "max(shortened_urls_total) or (vector(0))", "legendFormat": "Total URLs" } 
             ],
             "options": {
               "colorMode": "value",
