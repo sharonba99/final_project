@@ -7,13 +7,67 @@ It features a microservices architecture deployed on Minikube using Terraform an
 
 ## Project Structure
 
-* **frontend-app/**: React/Vite Frontend
-* **backend-api/**: Python/Flask Backend
-* **devops-infra/**: DevOps Infrastructure
-    * **kubernetes/**: K8s Manifests (DB, Backend, Frontend, Ingress)
-    * **monitoring/**: Prometheus and Grafana Configuration
-    * **terraform/**: Infrastructure as Code (Workspaces)
-
+├── backend
+│   ├── app.py
+│   ├── Dockerfile
+│   ├── requirements.txt
+│   └── test_app.py
+├── docker-compose.yaml
+├── frontend
+│   ├── Dockerfile
+│   ├── index.html
+│   ├── nginx.conf
+│   ├── package.json
+│   ├── package-lock.json
+│   ├── src
+│   │   ├── App.css
+│   │   ├── App.jsx
+│   │   └── main.jsx
+│   └── vite.config.js
+├── jenkins
+│   ├── Jenkinsfile
+│   └── jenkins-kubeconfig.yaml
+├── kubernetes
+│   ├── backend
+│   │   ├── configmap.yaml
+│   │   ├── deployment.yaml
+│   │   ├── hpa.yaml
+│   │   ├── secret.yaml
+│   │   └── service.yaml
+│   ├── database
+│   │   ├── secret.yaml
+│   │   ├── service.yaml
+│   │   └── statefulset.yaml
+│   ├── frontend
+│   │   ├── configmap.yaml
+│   │   ├── deployment.yaml
+│   │   ├── hpa.yaml
+│   │   └── service.yaml
+│   ├── ingress
+│   │   └── ingress.yaml
+│   ├── monitoring
+│   │   ├── grafana
+│   │   │   ├── clusterrole.yaml
+│   │   │   ├── configmap.yaml
+│   │   │   ├── dashboards
+│   │   │   ├── deployment.yaml
+│   │   │   └── service.yaml
+│   │   └── prometheus
+│   │       ├── clusterrole.yaml
+│   │       ├── configmap.yaml
+│   │       ├── deployment.yaml
+│   │       └── service.yaml
+│   └── namespaces
+│       └── namespace.yaml
+├── README.md
+└── terraform
+    ├── main.tf
+    ├── modules
+    │   └── k8s-infra
+    │       ├── main.tf
+    │       ├── outputs.tf
+    │       └── variables.tf
+    └── outputs.tf
 ---
 
 ## Local Development Environment
