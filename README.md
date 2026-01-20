@@ -84,9 +84,10 @@ It features a microservices architecture deployed on Minikube using Terraform an
 
       # Windows
       choco install minikube
-
+```
+    ```
       In order to access the URL you need to add it to /etc/hosts
-      First do the command minikube ip and put the output in the file
+      First do the command minikube ip and put the output in the file:
       192.168.9.1 urlshortener.local
   ```
 * **Terraform** executable
@@ -108,12 +109,12 @@ Since we are using Minikube, images must be built locally and loaded into the no
 
 ```powershell
 # Build Backend
-cd backend-api
+cd backend
 docker build -t sharonba/url-shortener-backend:latest .
 minikube image load sharonba/url-shortener-backend:latest
 
 # Build Frontend
-cd ../frontend-app
+cd ../frontend
 docker build -t sharonba/url-shortener-frontend:latest .
 minikube image load sharonba/url-shortener-frontend:latest
 ```
