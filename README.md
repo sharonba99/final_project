@@ -72,8 +72,8 @@ It features a microservices architecture deployed on Minikube using Terraform an
 
 ## Local Development Environment
 
-### 1. Prerequisites
-* **Minikube** installed
+### Prerequisites
+* **Minikube** 
   ```powershell
       # MacOs
       brew install minikube
@@ -90,9 +90,8 @@ It features a microservices architecture deployed on Minikube using Terraform an
       First do the command minikube ip and put the output IP address in the file:
       192.168.9.1 urlshortener.local
      ```
-* **Terraform** executable
 
-### 2. Infrastructure (Terraform)
+### Terraform
 We use Terraform Workspaces to manage environment-specific resources.
 
 ```powershell
@@ -101,9 +100,9 @@ cd devops-infra/terraform
 ./terraform workspace select dev
 ./terraform apply -auto-approve
 ```
----
 
-Build and Deployment
+
+## Build and Deployment
 Since we are using Minikube, images must be built locally and loaded into the node:
 
 ```powershell
@@ -127,11 +126,11 @@ cd kubernetes
 kubectl create namespace urlshortener
 kubectl apply -f . -R -n urlshortener
 ```
----
 
-Monitoring Stack
+## Monitoring Stack
 The project includes a monitoring stack based on Prometheus and Grafana to track application performance.
-
+Access the Grafana dashboard by going to urlshortener.local:32000
+To access the Prometheus UI first port forward port 9090 with the command kubectl port-forward deploy/prometheus-deployment 9090:9090 -n urlshortener and then go to localhost:9090
 Installation
 ```powershell
 helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
