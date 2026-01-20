@@ -9,7 +9,7 @@ data:
   prometheus.yml: |
     global:
       scrape_interval: 15s 
-      evaluation_interval: 15s
+      evaluation_interval: 10s
 
     rule_files:
       - /etc/prometheus/alert_rules.yml
@@ -112,20 +112,35 @@ data:
     groups:
     - name: url_shortener_alerts
       rules:
-      - alert: HighCpuUsage
-        expr: container_cpu_usage_seconds_total > 0.8
-        for: 2m
-        annotations:
-          summary: "High CPU usage on {{ $labels.pod }}"
       
-      - alert: APIErrorsHigh
-        expr: rate(http_requests_total{http_status=~"5.."}[5m]) > 0.05
-        for: 1m
+      - alert: HighCpuUsage
+        expr: sum(rate(container_cpu_usage_seconds_total{namespace="urlshortener", pod=~"backend-.*"}[1m])) by (pod) > 0.5
+        for: 5m
+        labels:
+          severity: warning
         annotations:
-          summary: "API Error rate is above 5% on {{ $labels.instance }}"
+          summary: "High CPU usage on pod {{ $labels.pod }}"
 
-      - alert: DatabaseConnectionIssues
-        expr: db_connections_active == 0
-        for: 30s
+      - alert: PodRestartDetected
+        expr: sum(changes(kube_pod_container_status_restarts_total{pod=~"backend-.*"}[1m])) by (pod) > 0
+        for: 0m
+        labels:
+          severity: critical
         annotations:
-          summary: "Backend cannot reach Database"
+          summary: "Pod {{ $labels.pod }} restarted!"
+
+      - alert: HighApiErrorRate
+        expr: (sum(rate(http_requests_total{http_status=~"5.."}[5m])) / sum(rate(http_requests_total[1m]))) > 0.05
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High error rate detected: {{ $value | humanizePercentage }}"
+
+      - alert: DatabaseConnectionFailing
+        expr: db_connections_active > 18 
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Database connection pool near exhaustion on {{ $labels.pod }}"
