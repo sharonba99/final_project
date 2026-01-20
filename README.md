@@ -118,7 +118,7 @@ minikube image load sharonba/url-shortener-frontend:latest
 ```
 ---
 
-Kubernetes Manifests
+## Kubernetes Manifests
 Apply the manifests to the cluster in the required order:
 
 ```powershell
