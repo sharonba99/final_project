@@ -141,12 +141,3 @@ helm repo add prometheus-community https://prometheus-community.github.io/helm-c
 helm install monitoring-stack prometheus-community/kube-prometheus-stack --namespace monitoring --create-namespace
 ```
 
-Key Metrics Tracked
-Request Rate: HTTP requests per second (p50,p95,p99).
-Active backend pods.
-System Health: CPU and Memory usage per pod.
-
-Access Information
-Application UI: http://urlshortener.local
-Metrics Endpoint: http://urlshortener.local/api/metrics
-Grafana Access: Run kubectl port-forward svc/monitoring-stack-grafana 3000:80 -n monitoring and visit http://localhost:3000
