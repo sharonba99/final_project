@@ -84,12 +84,12 @@ It features a microservices architecture deployed on Minikube using Terraform an
 
       # Windows
       choco install minikube
-```
-    ```
-      In order to access the URL you need to add it to /etc/hosts
-      First do the command minikube ip and put the output in the file:
-      192.168.9.1 urlshortener.local
   ```
+     ```
+      In order to access the URL you need to add it to /etc/hosts
+      First do the command minikube ip and put the output IP address in the file:
+      192.168.9.1 urlshortener.local
+     ```
 * **Terraform** executable
 
 ### 2. Infrastructure (Terraform)
@@ -104,7 +104,6 @@ cd devops-infra/terraform
 ---
 
 Build and Deployment
-Build and Load Images
 Since we are using Minikube, images must be built locally and loaded into the node:
 
 ```powershell
