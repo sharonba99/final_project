@@ -77,13 +77,16 @@ It features a microservices architecture deployed on Minikube using Terraform an
   ```powershell
       # MacOs
       brew install minikube
-      
+      minikube start
+  
       # Linux 
       curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
       sudo install minikube-linux-amd64 /usr/local/bin/minikube
+      minikube start
 
       # Windows
       choco install minikube
+      minikube start
   ```
      ```
       In order to access the URL you need to add it to /etc/hosts
