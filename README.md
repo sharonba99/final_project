@@ -72,7 +72,7 @@ It features a microservices architecture deployed on Minikube using Terraform an
 
 ## Local Development Environment
 
-### Prerequisites
+## Prerequisites
 * **Minikube** 
   ```powershell
       # MacOs
@@ -91,7 +91,7 @@ It features a microservices architecture deployed on Minikube using Terraform an
       192.168.9.1 urlshortener.local
      ```
 
-### Terraform
+## Terraform
 We use Terraform Workspaces to manage environment-specific resources.
 
 ```powershell
