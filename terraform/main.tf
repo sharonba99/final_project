@@ -8,8 +8,7 @@ terraform {
 }
 
 provider "kubernetes" {
-  config_path    = "~/.kube/config"
-  config_context = "minikube"
+  # config_path = "~/.kube/config" 
 }
 
 # 1. Namespace (Created dynamically based on workspace: dev/prod)
