@@ -8,7 +8,6 @@ terraform {
 }
 
 provider "kubernetes" {
-  # config_path = "~/.kube/config" 
 }
 
 resource "kubernetes_namespace_v1" "env_namespace" {
@@ -21,14 +20,14 @@ resource "kubernetes_namespace_v1" "env_namespace" {
   }
 }
 
-resource "kubernetes_service_account" "app_sa" {
+resource "kubernetes_service_account_v1" "app_sa" {
   metadata {
     name      = "${var.app_name}-sa"
     namespace = kubernetes_namespace_v1.env_namespace.metadata[0].name
   }
 }
 
-resource "kubernetes_role" "pod_reader" {
+resource "kubernetes_role_v1" "pod_reader" {
   metadata {
     name      = "pod-reader"
     namespace = kubernetes_namespace_v1.env_namespace.metadata[0].name
@@ -41,7 +40,7 @@ resource "kubernetes_role" "pod_reader" {
   }
 }
 
-resource "kubernetes_role_binding" "bind_sa" {
+resource "kubernetes_role_binding_v1" "bind_sa" {
   metadata {
     name      = "bind-sa-reader"
     namespace = kubernetes_namespace_v1.env_namespace.metadata[0].name
@@ -49,16 +48,16 @@ resource "kubernetes_role_binding" "bind_sa" {
   role_ref {
     api_group = "rbac.authorization.k8s.io"
     kind      = "Role"
-    name      = kubernetes_role.pod_reader.metadata[0].name
+    name      = kubernetes_role_v1.pod_reader.metadata[0].name
   }
   subject {
     kind      = "ServiceAccount"
-    name      = kubernetes_service_account.app_sa.metadata[0].name
+    name      = kubernetes_service_account_v1.app_sa.metadata[0].name
     namespace = kubernetes_namespace_v1.env_namespace.metadata[0].name
   }
 }
 
-resource "kubernetes_secret" "docker_registry" {
+resource "kubernetes_secret_v1" "docker_registry" {
   metadata {
     name      = "registry-credentials"
     namespace = kubernetes_namespace_v1.env_namespace.metadata[0].name
@@ -70,14 +69,14 @@ resource "kubernetes_secret" "docker_registry" {
     ".dockerconfigjson" = jsonencode({
       auths = {
         "https://index.docker.io/v1/" = {
-          auth = "dXNlcm5hbWU6cGFzc3dvcmQ=" # Placeholder
+          auth = "dXNlcm5hbWU6cGFzc3dvcmQ="
         }
       }
     })
   }
 }
 
-resource "kubernetes_network_policy" "allow_app_traffic" {
+resource "kubernetes_network_policy_v1" "allow_app_traffic" {
   metadata {
     name      = "allow-ingress"
     namespace = kubernetes_namespace_v1.env_namespace.metadata[0].name
