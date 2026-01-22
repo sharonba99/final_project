@@ -8,10 +8,8 @@ terraform {
 }
 
 provider "kubernetes" {
-  # config_path = "~/.kube/config" 
 }
 
-# 1. Namespace (Created dynamically based on workspace: dev/prod)
 resource "kubernetes_namespace" "env_namespace" {
   metadata {
     name = "${var.app_name}-${terraform.workspace}"
@@ -22,7 +20,6 @@ resource "kubernetes_namespace" "env_namespace" {
   }
 }
 
-# 2. Service Account (Identity)
 resource "kubernetes_service_account" "app_sa" {
   metadata {
     name      = "${var.app_name}-sa"
@@ -30,7 +27,6 @@ resource "kubernetes_service_account" "app_sa" {
   }
 }
 
-# 3. Role (Permissions)
 resource "kubernetes_role" "pod_reader" {
   metadata {
     name      = "pod-reader"
@@ -44,7 +40,6 @@ resource "kubernetes_role" "pod_reader" {
   }
 }
 
-# 4. Role Binding (Connecting Identity to Permissions)
 resource "kubernetes_role_binding" "bind_sa" {
   metadata {
     name      = "bind-sa-reader"
@@ -62,7 +57,6 @@ resource "kubernetes_role_binding" "bind_sa" {
   }
 }
 
-# 5. Secret (Registry Credentials)
 resource "kubernetes_secret" "docker_registry" {
   metadata {
     name      = "registry-credentials"
@@ -75,14 +69,13 @@ resource "kubernetes_secret" "docker_registry" {
     ".dockerconfigjson" = jsonencode({
       auths = {
         "https://index.docker.io/v1/" = {
-          auth = "dXNlcm5hbWU6cGFzc3dvcmQ=" # Placeholder
+          auth = "dXNlcm5hbWU6cGFzc3dvcmQ="
         }
       }
     })
   }
 }
 
-# 6. Network Policy (Security)
 resource "kubernetes_network_policy" "allow_app_traffic" {
   metadata {
     name      = "allow-ingress"

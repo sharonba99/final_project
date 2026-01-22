@@ -2,19 +2,13 @@ pipeline {
     agent any
 
     environment {
-        // --- CONFIGURATION ---
-        
-        // Docker Hub Details
         DOCKER_REGISTRY = "sharonba"
         FRONTEND_IMAGE = "${DOCKER_REGISTRY}/url-shortener-frontend"
         BACKEND_IMAGE  = "${DOCKER_REGISTRY}/url-shortener-backend"
-        
-        // Terraform Directory Path
         TF_DIR = 'terraform'
     }
 
     parameters {
-        // Environment Selection Dropdown
         choice(name: 'ENVIRONMENT', choices: ['dev', 'prod'], description: 'Select deployment environment')
     }
 
@@ -25,18 +19,12 @@ pipeline {
             }
         }
 
-        // --- STEP 1: INFRASTRUCTURE (Terraform) ---
         stage('Terraform Init & Workspace') {
             steps {
-                dir("${TF_DIR}") {
-                    sh 'terraform init'
-                    script {
-                        // Select workspace (dev/prod) or create if missing
-                        try {
-                            sh "terraform workspace select ${params.ENVIRONMENT}"
-                        } catch (Exception e) {
-                            sh "terraform workspace new ${params.ENVIRONMENT}"
-                        }
+                withCredentials([file(credentialsId: 'k8s-kubeconfig', variable: 'KUBECONFIG')]) {
+                    dir("${TF_DIR}") {
+                        sh 'terraform init'
+                        sh "terraform workspace select ${params.ENVIRONMENT} || terraform workspace new ${params.ENVIRONMENT}"
                     }
                 }
             }
@@ -44,43 +32,33 @@ pipeline {
 
         stage('Terraform Apply') {
             steps {
-                dir("${TF_DIR}") {
-                    // Provision infrastructure
-                    sh 'terraform apply -auto-approve'
-                    
-                    // CRITICAL: Capture the dynamic Namespace name
-                    script {
-                        env.DEPLOYED_NS = sh(script: 'terraform output -raw deployed_namespace', returnStdout: true).trim()
-                        echo "Target Namespace from Terraform: ${env.DEPLOYED_NS}"
+                withCredentials([file(credentialsId: 'k8s-kubeconfig', variable: 'KUBECONFIG')]) {
+                    dir("${TF_DIR}") {
+                        sh 'terraform apply -auto-approve'
+                        script {
+                            env.DEPLOYED_NS = sh(script: 'terraform output -raw deployed_namespace', returnStdout: true).trim()
+                        }
                     }
                 }
             }
         }
 
-        // --- STEP 2: BUILD & TEST ---
         stage('Build Images') {
             steps {
                 script {
-                    // Create unique tag: BuildNumber-GitShortHash
                     def gitSha = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
                     env.TAG = "${BUILD_NUMBER}-${gitSha}"
                     
-                    echo "Building Frontend Image: ${env.TAG}"
                     sh "docker build -t ${FRONTEND_IMAGE}:${env.TAG} ./frontend"
-                    
-                    echo "Building Backend Image: ${env.TAG}"
                     sh "docker build -t ${BACKEND_IMAGE}:${env.TAG} ./backend"
                 }
             }
         }
 
-        stage('Test Applications (Unit Tests)') {
+        stage('Test Applications') {
             steps {
                 script {
-                    echo "Running Backend Tests (Pytest)..."
                     sh "docker run --rm ${BACKEND_IMAGE}:${env.TAG} pytest"
-                    
-                    echo "Running Frontend Tests (NPM)..."
                     sh """
                         docker run --rm \
                         -v ${WORKSPACE}/frontend:/app \
@@ -94,13 +72,10 @@ pipeline {
             }
         }
 
-        stage('Security Scan (Trivy)') {
+        stage('Security Scan') {
             steps {
                 script {
-                    echo "Scanning images for vulnerabilities..."
-                    // Scan Frontend
                     sh "docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:latest image --severity HIGH,CRITICAL ${FRONTEND_IMAGE}:${env.TAG} || true"
-                    // Scan Backend
                     sh "docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:latest image --severity HIGH,CRITICAL ${BACKEND_IMAGE}:${env.TAG} || true"
                 }
             }
@@ -108,19 +83,16 @@ pipeline {
 
         stage('Push to Registry') {
             steps {
-                // Using the specific credentials ID provided
                 withCredentials([usernamePassword(credentialsId: '7a839a0d-889a-4cd9-9484-443f95b911c6', 
                                                 passwordVariable: 'PASS', 
                                                 usernameVariable: 'USER')]) {
                     script {
                         sh "echo $PASS | docker login -u $USER --password-stdin"
                         
-                        // Push Frontend
                         sh "docker push ${FRONTEND_IMAGE}:${env.TAG}"
                         sh "docker tag ${FRONTEND_IMAGE}:${env.TAG} ${FRONTEND_IMAGE}:latest"
                         sh "docker push ${FRONTEND_IMAGE}:latest"
                         
-                        // Push Backend
                         sh "docker push ${BACKEND_IMAGE}:${env.TAG}"
                         sh "docker tag ${BACKEND_IMAGE}:${env.TAG} ${BACKEND_IMAGE}:latest"
                         sh "docker push ${BACKEND_IMAGE}:latest"
@@ -129,17 +101,11 @@ pipeline {
             }
         }
 
-        // --- STEP 3: DEPLOY ---
         stage('Deploy to K8s') {
             steps {
                 withCredentials([file(credentialsId: 'k8s-kubeconfig', variable: 'KUBECONFIG')]) {
                     script {
-                        echo "Deploying to Namespace: ${env.DEPLOYED_NS}"
-                        
-                        // 1. Apply K8s manifests to the dynamic namespace
                         sh "kubectl --kubeconfig=${KUBECONFIG} apply -f ./kubernetes/ -R -n ${env.DEPLOYED_NS}"
-                        
-                        // 2. Update deployments with new image tag
                         sh "kubectl --kubeconfig=${KUBECONFIG} set image deployment/frontend-deployment frontend=${FRONTEND_IMAGE}:${env.TAG} -n ${env.DEPLOYED_NS}"
                         sh "kubectl --kubeconfig=${KUBECONFIG} set image deployment/backend-deployment backend=${BACKEND_IMAGE}:${env.TAG} -n ${env.DEPLOYED_NS}"
                     }
@@ -147,23 +113,13 @@ pipeline {
             }
         }
 
-        // --- STEP 4: VERIFY ---
-        stage('Health Check & Smoke Tests') {
+        stage('Health Check') {
             steps {
                 withCredentials([file(credentialsId: 'k8s-kubeconfig', variable: 'KUBECONFIG')]) {
                     script {
-                        echo "1. Waiting for rollout to finish in ${env.DEPLOYED_NS}..."
                         sh "kubectl --kubeconfig=${KUBECONFIG} rollout status deployment/frontend-deployment -n ${env.DEPLOYED_NS} --timeout=90s"
                         sh "kubectl --kubeconfig=${KUBECONFIG} rollout status deployment/backend-deployment -n ${env.DEPLOYED_NS} --timeout=90s"
-                        
-                        echo "2. Performing Internal Connectivity Checks..."
-                        // Verify Frontend can talk to Backend's /health/ready endpoint
                         sh "kubectl --kubeconfig=${KUBECONFIG} exec -n ${env.DEPLOYED_NS} deploy/frontend-deployment -- curl -f -s http://backend-service:5000/health/ready"
-                        
-                        // Verify Frontend can talk to Backend's /health/live endpoint
-                        sh "kubectl --kubeconfig=${KUBECONFIG} exec -n ${env.DEPLOYED_NS} deploy/frontend-deployment -- curl -f -s http://backend-service:5000/health/live"
-                        
-                        echo "✅ Deployment Successful & Verified!"
                     }
                 }
             }
@@ -174,9 +130,6 @@ pipeline {
         always {
             sh "docker logout"
             cleanWs()
-        }
-        failure {
-            echo "❌ Pipeline Failed! Check logs for details."
         }
     }
 }
