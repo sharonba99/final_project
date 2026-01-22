@@ -1,6 +1,6 @@
 output "deployed_namespace" {
   description = "The namespace created for this environment"
-  value       = kubernetes_namespace.env_namespace.metadata[0].name
+  value       = kubernetes_namespace_v1.env_namespace.metadata[0].name
 }
 
 output "service_account_name" {

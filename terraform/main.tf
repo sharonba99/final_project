@@ -8,9 +8,10 @@ terraform {
 }
 
 provider "kubernetes" {
+  # config_path = "~/.kube/config" 
 }
 
-resource "kubernetes_namespace" "env_namespace" {
+resource "kubernetes_namespace_v1" "env_namespace" {
   metadata {
     name = "${var.app_name}-${terraform.workspace}"
     labels = {
@@ -23,14 +24,14 @@ resource "kubernetes_namespace" "env_namespace" {
 resource "kubernetes_service_account" "app_sa" {
   metadata {
     name      = "${var.app_name}-sa"
-    namespace = kubernetes_namespace.env_namespace.metadata[0].name
+    namespace = kubernetes_namespace_v1.env_namespace.metadata[0].name
   }
 }
 
 resource "kubernetes_role" "pod_reader" {
   metadata {
     name      = "pod-reader"
-    namespace = kubernetes_namespace.env_namespace.metadata[0].name
+    namespace = kubernetes_namespace_v1.env_namespace.metadata[0].name
   }
 
   rule {
@@ -43,7 +44,7 @@ resource "kubernetes_role" "pod_reader" {
 resource "kubernetes_role_binding" "bind_sa" {
   metadata {
     name      = "bind-sa-reader"
-    namespace = kubernetes_namespace.env_namespace.metadata[0].name
+    namespace = kubernetes_namespace_v1.env_namespace.metadata[0].name
   }
   role_ref {
     api_group = "rbac.authorization.k8s.io"
@@ -53,14 +54,14 @@ resource "kubernetes_role_binding" "bind_sa" {
   subject {
     kind      = "ServiceAccount"
     name      = kubernetes_service_account.app_sa.metadata[0].name
-    namespace = kubernetes_namespace.env_namespace.metadata[0].name
+    namespace = kubernetes_namespace_v1.env_namespace.metadata[0].name
   }
 }
 
 resource "kubernetes_secret" "docker_registry" {
   metadata {
     name      = "registry-credentials"
-    namespace = kubernetes_namespace.env_namespace.metadata[0].name
+    namespace = kubernetes_namespace_v1.env_namespace.metadata[0].name
   }
 
   type = "kubernetes.io/dockerconfigjson"
@@ -69,7 +70,7 @@ resource "kubernetes_secret" "docker_registry" {
     ".dockerconfigjson" = jsonencode({
       auths = {
         "https://index.docker.io/v1/" = {
-          auth = "dXNlcm5hbWU6cGFzc3dvcmQ="
+          auth = "dXNlcm5hbWU6cGFzc3dvcmQ=" # Placeholder
         }
       }
     })
@@ -79,7 +80,7 @@ resource "kubernetes_secret" "docker_registry" {
 resource "kubernetes_network_policy" "allow_app_traffic" {
   metadata {
     name      = "allow-ingress"
-    namespace = kubernetes_namespace.env_namespace.metadata[0].name
+    namespace = kubernetes_namespace_v1.env_namespace.metadata[0].name
   }
 
   spec {
