@@ -89,7 +89,7 @@ It features a microservices architecture deployed on Minikube using Terraform an
   ```
      ```
       In order to access the URL you need to add it to /etc/hosts
-      First do the command minikube ip and put the output IP address in the file:
+      First do the command minikube ip and put the output IP address in the file like so:
       192.168.9.1 urlshortener.local
      ```
 * **Kubernetes**
