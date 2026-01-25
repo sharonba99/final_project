@@ -92,6 +92,11 @@ It features a microservices architecture deployed on Minikube using Terraform an
       First do the command minikube ip and put the output IP address in the file:
       192.168.9.1 urlshortener.local
      ```
+* **Kubernetes**
+    https://kubernetes.io/releases/download/
+  
+* **Docker**
+    https://www.docker.com/get-started/
 
 ## Terraform
 We use Terraform Workspaces to manage environment-specific resources.
