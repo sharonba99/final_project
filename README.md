@@ -50,6 +50,8 @@ It features a microservices architecture deployed on Minikube using Terraform an
 │   │   │   ├── clusterrole.yaml
 │   │   │   ├── configmap.yaml
 │   │   │   ├── dashboards
+│   │   │   |   ├── app-dashboard.yaml
+|   |   |   |   ├── k8s-dashboard.yaml
 │   │   │   ├── deployment.yaml
 │   │   │   └── service.yaml
 │   │   └── prometheus
