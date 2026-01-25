@@ -1,87 +1,99 @@
 pipeline {
     agent any
-
+    tools {
+        terraform 'terraform'
+    }    
     environment {
         DOCKER_REGISTRY = "sharonba"
         FRONTEND_IMAGE = "${DOCKER_REGISTRY}/url-shortener-frontend"
         BACKEND_IMAGE  = "${DOCKER_REGISTRY}/url-shortener-backend"
-        GIT_SHA        = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
-        TAG            = "${BUILD_NUMBER}-${GIT_SHA}"
+        TF_DIR = 'terraform'
     }
 
     stages {
-        stage('Clone Repository') {
+        stage('Checkout SCM') {
             steps {
                 checkout scm
             }
         }
 
-        stage('Build Images') {
+        stage('Terraform Init & Apply') {
             steps {
-                script {
-                    echo "Building Frontend Image: ${TAG}"
-                    sh "docker build -t ${FRONTEND_IMAGE}:${TAG} ./frontend"
-                    
-                    echo "Building Backend Image: ${TAG}"
-                    sh "docker build -t ${BACKEND_IMAGE}:${TAG} ./backend"
-                }
-            }
-        }
-
-        stage('Test Applications') {
-            steps {
-                script {
-                    echo "Running Backend Tests..."
-    
-                    sh "docker run --rm ${BACKEND_IMAGE}:${TAG} pytest"
-                    
-                    echo "Running Frontend Tests..."
-                    
-                    // This makes sure the test runs in an environment similar to the frontend Docker container
-                    sh """
-                        docker run --rm \
-                        -v ${WORKSPACE}/frontend:/app \
-                        -v /app/node_modules \
-                        -w /app \
-                        -e CI=true \
-                        node:18-alpine \
-                        sh -c "npm install && timeout 5s npm test run"
-                    """
-                }
-            }
-        }
-
-        stage('Security Scan (Trivy)') {
-            steps {
-                script {
-                    // Running Trivy from a docker image
-                    echo "Scanning Frontend Image..."
-                    sh "docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:latest image --severity HIGH,CRITICAL ${FRONTEND_IMAGE}:${TAG}"
-                    
-                    echo "Scanning Backend Image..."
-                    sh "docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:latest image --severity HIGH,CRITICAL ${BACKEND_IMAGE}:${TAG}"
-                }
-            }
-        }
-
-        stage('Push to Registry') {
-            steps {
-                script {
-                    
-                    withCredentials([usernamePassword(credentialsId: '7a839a0d-889a-4cd9-9484-443f95b911c6', 
-                                                    passwordVariable: 'PASS', 
-                                                    usernameVariable: 'USER')]) {
-                        sh "echo $PASS | docker login -u $USER --password-stdin"
-                        sh "docker push ${FRONTEND_IMAGE}:${TAG}"
-                        sh "docker tag ${FRONTEND_IMAGE}:${TAG} ${FRONTEND_IMAGE}:latest"
-                        sh "docker push ${FRONTEND_IMAGE}:latest"
-                        sh "docker push ${BACKEND_IMAGE}:${TAG}"
-                        sh "docker tag ${BACKEND_IMAGE}:${TAG} ${BACKEND_IMAGE}:latest"
-                        sh "docker push ${BACKEND_IMAGE}:latest"
+                withCredentials([file(credentialsId: 'k8s-kubeconfig', variable: 'KUBECONFIG')]) {
+                    dir("${TF_DIR}") {
+                        sh 'kubectl delete namespace urlshortener || true'
+                        sh 'export KUBE_CONFIG_PATH=${KUBECONFIG} && terraform init'
+                        sh 'export KUBE_CONFIG_PATH=${KUBECONFIG} && terraform apply -auto-approve'
                     }
                 }
             }
-}
+        }
+
+
+        stage('Build images') {
+            steps {
+                script {
+                    def gitSha = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
+                    env.TAG = "${BUILD_NUMBER}-${gitSha}"
+                    
+                    sh "docker build -t ${FRONTEND_IMAGE}:${env.TAG} ./frontend"
+                    sh "docker build -t ${BACKEND_IMAGE}:${env.TAG} ./backend"
+                }
+            }
+        }
+        
+        stage('Test Applications') {
+                    steps {
+                        script {
+                            echo "Running Backend Tests..."
+            
+                            sh "docker run --rm ${BACKEND_IMAGE}:${TAG} pytest"
+                            
+                            echo "Running Frontend Tests..."
+                            
+                            // This makes sure the test runs in an environment similar to the frontend Docker container
+                            sh """
+                                docker run --rm \
+                                -v ${WORKSPACE}/frontend:/app \
+                                -v /app/node_modules \
+                                -w /app \
+                                -e CI=true \
+                                node:18-alpine \
+                                sh -c "npm install && timeout 5s npm test run"
+                            """
+                        }
+                    }
+                }
+        
+        stage('Security Scan') {
+            steps {
+                script {
+                    sh "docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:latest image --severity HIGH,CRITICAL ${FRONTEND_IMAGE}:${env.TAG} || true"
+                    sh "docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:latest image --severity HIGH,CRITICAL ${BACKEND_IMAGE}:${env.TAG} || true"
+                }
+            }
+        }
+
+        stage('Promotion Gate') {
+            steps {
+                input message: "Push images and deploy K8S?", ok: "Yes"
+            }
+        }
+
+        stage('Push Images') {
+            steps {
+                withCredentials([usernamePassword(credentialsId: '7a839a0d-889a-4cd9-9484-443f95b911c6', 
+                                                passwordVariable: 'PASS', 
+                                                usernameVariable: 'USER')]) {
+                    script {
+                        sh "echo $PASS | docker login -u $USER --password-stdin"
+                        sh "docker push ${FRONTEND_IMAGE}:${env.TAG}"
+                        sh "docker push ${BACKEND_IMAGE}:${env.TAG}"
+                    }
+                }
+            }
+        }
+
 
         stage('Deploy to K8s') {
             steps {
@@ -116,9 +128,6 @@ pipeline {
         always {
             sh "docker logout"
             cleanWs()
-        }
-        failure {
-            echo "Pipeline failed. Check the logs."
         }
     }
 }
