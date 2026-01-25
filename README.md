@@ -72,7 +72,7 @@ It features a microservices architecture deployed on Minikube using Terraform an
 ## Local Development Environment
 
 ## Prerequisites
-* **Minikube** 
+* **Minikube**
   ```powershell
       # MacOs
       brew install minikube
@@ -97,6 +97,10 @@ It features a microservices architecture deployed on Minikube using Terraform an
   
 * **Docker**
     https://www.docker.com/get-started/
+  
+* **Terraform**
+    https://developer.hashicorp.com/terraform/install
+
 
 ## Terraform
 We use Terraform Workspaces to manage environment-specific resources.
