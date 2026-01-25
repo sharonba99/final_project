@@ -138,8 +138,5 @@ To access the Prometheus UI first port forward port 9090 with the command
 kubectl port-forward deploy/prometheus-deployment 9090:9090 -n urlshortener
 and then go to localhost:9090
 ```
-```powershell
-helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
-helm install monitoring-stack prometheus-community/kube-prometheus-stack --namespace monitoring --create-namespace
-```
+
 
