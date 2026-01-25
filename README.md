@@ -106,7 +106,7 @@ It features a microservices architecture deployed on Minikube using Terraform an
 We use Terraform Workspaces to manage environment-specific resources.
 
 ```powershell
-cd devops-infra/terraform
+cd terraform
 terraform init
 kubectl delete namespace urlshortener # Making sure the namespace is removed since applying creates the namespace again.
 terraform apply -auto-approve
