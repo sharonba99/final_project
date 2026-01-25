@@ -99,9 +99,9 @@ We use Terraform Workspaces to manage environment-specific resources.
 
 ```powershell
 cd devops-infra/terraform
-./terraform init
-./terraform workspace select dev
-./terraform apply -auto-approve
+terraform init
+kubectl delete namespace urlshortener # Making sure the namespace is removed since applying creates the namespace again.
+terraform apply -auto-approve
 ```
 
 
