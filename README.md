@@ -62,11 +62,8 @@ It features a microservices architecture deployed on Minikube using Terraform an
 ├── README.md
 └── terraform
     ├── main.tf
-    ├── modules
-    │   └── k8s-infra
-    │       ├── main.tf
-    │       ├── outputs.tf
-    │       └── variables.tf
+    ├── backend.tf
+    ├── variables.tf
     └── outputs.tf
 ```
 
