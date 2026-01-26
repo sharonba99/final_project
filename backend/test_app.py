@@ -1,3 +1,5 @@
+# Test cases for the Flask logics in app.py
+
 import pytest
 from app import app
 from unittest.mock import patch, MagicMock

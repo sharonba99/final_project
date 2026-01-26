@@ -21,6 +21,7 @@ pipeline {
             steps {
                 withCredentials([file(credentialsId: 'k8s-kubeconfig', variable: 'KUBECONFIG')]) {
                     dir("${TF_DIR}") {
+                        sh 'minikube start || true'
                         sh 'kubectl delete namespace urlshortener || true'
                         sh 'export KUBE_CONFIG_PATH=${KUBECONFIG} && terraform init'
                         sh 'export KUBE_CONFIG_PATH=${KUBECONFIG} && terraform apply -auto-approve'

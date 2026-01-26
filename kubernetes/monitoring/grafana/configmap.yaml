@@ -1,4 +1,4 @@
-# Prometheus Data Source Config
+
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -21,7 +21,6 @@ data:
 
 ---
 
-# Dashboards Provider Config 
 apiVersion: v1
 kind: ConfigMap
 metadata:

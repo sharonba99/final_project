@@ -28,7 +28,6 @@ spec:
         volumeMounts:
         - name: db-persistent-storage
           mountPath: /var/lib/postgresql/data
-  # Persistent storage for the database
   volumeClaimTemplates:
   - metadata:
       name: db-persistent-storage

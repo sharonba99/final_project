@@ -13,7 +13,7 @@ function App() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     
-    // Reset state
+    
     setError(null)
     setCode('')
     setCopied(false)
@@ -33,11 +33,11 @@ function App() {
       body: JSON.stringify({ long_url: cleanUrl })
     });
 
-    // Handle different response scenarios
+    
     if (!res.ok) {
       const errorData = await res.json();
       
-      // Send error if the URL format is invalid
+     
       if (res.status === 400) {
         throw new Error("Invalid URL. Please check the format.");
       }
@@ -50,8 +50,7 @@ function App() {
     
   } catch (err) {
     console.error(err);
-    // If the error message is specifically from our logic, show it.
-    // Otherwise, assume the backend is down.
+    
     if (err.message === "Invalid URL. Please check the format.") {
         setError(err.message);
     } else {
@@ -62,7 +61,7 @@ function App() {
   }
 };
 
-  // Copy to clipboard functionality
+
   const handleCopy = () => {
     if (!code) return;
     

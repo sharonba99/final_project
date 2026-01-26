@@ -45,7 +45,7 @@ def stop_request_tracking(exception=None):
     if not request.path.startswith('/health') and request.path != '/metrics':
         IN_PROGRESS.dec()
 
-# Database Configuration
+# Database Configuration 
 DB_HOST = os.environ.get('POSTGRES_HOST', 'database-service')
 DB_NAME = os.environ.get('POSTGRES_DB', 'hostdb')
 DB_USER = os.environ.get('POSTGRES_USER', 'devuser')
@@ -53,6 +53,7 @@ DB_PASS = os.environ.get('POSTGRES_PASSWORD', 'devpassword')
 
 db_pool = None
 
+# Checks for a valid URL format
 def is_valid_url(url):
     url_pattern = re.compile(
         r'^(https?://)?' 
@@ -61,6 +62,8 @@ def is_valid_url(url):
         r'(/.*)?$', re.IGNORECASE
     )
     return re.match(url_pattern, url) is not None
+
+# Database Connection
 
 def get_db_pool():
     global db_pool
@@ -94,7 +97,7 @@ def release_conn(conn):
         if db_pool:
             DB_CONNECTIONS.set(len(db_pool._used))
 
-# Database Connection
+
 def init_db():
     print(f"[DEBUG] Attempting to init DB at {DB_HOST}...")
     for i in range(15):
