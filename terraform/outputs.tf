@@ -21,7 +21,3 @@ output "eks_cluster_name" {
 output "ecr_repository_url" {
   value       = aws_ecr_repository.app_repo.repository_url
 }
-
-output "deployed_namespace" {
-  value       = kubernetes_namespace_v1.env_namespace.metadata[0].name
-}
