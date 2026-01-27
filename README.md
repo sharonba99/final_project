@@ -65,8 +65,13 @@ It features a microservices architecture deployed on Minikube using Terraform an
 └── terraform
     ├── main.tf
     ├── backend.tf
+    ├── eks.tf
+    ├── iam.tf
     ├── variables.tf
     └── outputs.tf
+
+
+
 ```
 
 ## Local Development Environment
